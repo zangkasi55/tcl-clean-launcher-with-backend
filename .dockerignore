@@ -1,0 +1,13 @@
+**
+!Dockerfile
+!controller/
+!controller/pyproject.toml
+!controller/requirements.lock
+!controller/tvcontrol/
+!controller/tvcontrol/**
+!dist/
+!dist/tvhome-release.apk
+!LICENSE
+!launcher/
+!launcher/FONT-LICENSE-OFL.txt
+**/__pycache__/

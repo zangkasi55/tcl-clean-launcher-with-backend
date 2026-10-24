@@ -1,0 +1,43 @@
+services:
+  tvcontrol:
+    build: .
+    image: tcl-home-control:2.6.23
+    restart: unless-stopped
+    stop_grace_period: 120s
+    ports:
+      - "127.0.0.1:8787:8787"
+    environment:
+      TVCONTROL_TV_HOST: "${TVCONTROL_TV_HOST:-192.168.1.148}"
+      TVCONTROL_SECURE_COOKIE: "true"
+      TVCONTROL_REQUIRE_LOGIN: "false"
+      TVCONTROL_MANAGEMENT_NETWORKS: "${TVCONTROL_MANAGEMENT_NETWORKS:-}"
+      TVCONTROL_PUBLIC_ORIGIN: "${TVCONTROL_PUBLIC_ORIGIN:-}"
+      TVCONTROL_FRAME_ORIGIN: "${TVCONTROL_FRAME_ORIGIN:-}"
+      TVCONTROL_FRAME_ORIGINS: "${TVCONTROL_FRAME_ORIGINS:-}"
+      TVCONTROL_HA_URL: "${TVCONTROL_HA_URL:-}"
+      TVCONTROL_HA_TOKEN_FILE: "${TVCONTROL_HA_TOKEN_FILE:-}"
+      TVCONTROL_HA_PROFILE: "ess_link"
+    volumes:
+      - tvcontrol-data:/data
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=32m
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: 512m
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8787/healthz', timeout=3)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "3"
+
+volumes:
+  tvcontrol-data:
