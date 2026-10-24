@@ -1,74 +1,181 @@
-# Contributing
+# Contributing to TCL Clean Launcher with Backend
 
-Thanks for helping more TVs lose their ads. Three kinds of contributions are especially welcome.
+Thanks for helping make this launcher and controller clearer, safer and easier
+to use. Documentation, accessibility, localization, reproducible tests,
+backend fixes and small remote-first UI improvements are all welcome.
 
-## 1. Add your TV model
+[Documentation hub](docs/README.md) | [Architecture](docs/ARCHITECTURE.md) | [Build and tests](docs/BUILD.md) | [Privacy](docs/PRIVACY.md)
 
-Every brand ships different bloat. If you ran the prompt (or did it by hand) on a TV that isn't in
-`examples/`, add it:
+## Access and scope
 
-1. Create `examples/<brand>-<model>/debloat.txt`. Copy the format from
-   `examples/xiaomi-mi-tv-4a/debloat.txt`: one package per line, grouped with a comment that says
-   what the group is, and a trailing comment on anything non-obvious ("re-enable for firmware
-   updates", "needed for HDMI-CEC", etc.).
-2. Put the exact model name, Android version and firmware build in the header so people can tell
-   whether it matches theirs. `tools/tv.py --probe` prints all three.
-3. Only list packages you have actually disabled and lived with for a few days. Note anything that
-   broke and what you re-enabled.
-4. Add a row to `examples/README.md`.
-5. If your TV's Live TV app or stock launcher has a different package name, say so in the header;
-   `tools/restore.sh` and `launcher/build-and-install.sh` accept them as arguments.
+The repository is currently private. Ask owner
+[zangkasi55](https://github.com/zangkasi55) for collaborator access through your
+existing contact channel. Cloning, downloads and PRs require access; the owner
+decides whether to invite contributors or make a future public release.
+Private forks are subject to GitHub/account policies and are not assumed.
 
-Never list packages to *uninstall*. Everything in this repo disables with `pm disable-user`, which
-is reversible from the TV's own settings if the tools are gone.
+This edition is **preservation-first**. Do not make bulk debloating, factory
+resets, app-data clearing, broad permissions or unrequested Home changes part
+of normal installation. Stock apps and sign-ins remain intact; guarded native
+HOME is a separately confirmed, bounded exception.
 
-## 2. Improve the launcher
+Open an issue before adding substantial dependencies, changing HOME/recovery
+policy, redesigning a protocol or expanding the supported firmware claims.
+Do not silently make an optional feature mandatory.
 
-The launcher lives in `launcher/` and is deliberately small: plain Java, AndroidX RecyclerView and
-DynamicAnimation, no Kotlin, no Compose, no network. It targets TVs with 1 GB of RAM, so:
+## Good first contributions
 
-- No blur, no video backgrounds, no polling, no background services.
-- Anything that depends on a specific TV goes in `app/src/main/res/values/config.xml`, not in code.
-- Keep D-pad navigation deterministic. Test Up/Down/Left/Right from every edge.
-- Verify on a real TV, not only the emulator. The easiest way is remote key injection plus a
-  screenshot: `tools/tv.py 'input keyevent KEYCODE_DPAD_DOWN; screencap -p /sdcard/s.png'` then
-  `tools/tv.py --pull /sdcard/s.png s.png`. Include a screenshot in your pull request.
+- Improve an installation step using a real, documented compatibility result.
+- Fix keyboard/focus or touch handling with a regression test.
+- Add a sanitized reproduction for an image, timezone or feed-quality edge case.
+- Improve error messages, localization or accessibility.
+- Make backend/photo test execution in CI more complete.
+- Update generic examples without adding private hostnames or credentials.
 
-Build with `TV_HOST=<ip> launcher/build-and-install.sh` (JDK 17, Android SDK platform 34 and
-build-tools 34.0.0; on macOS `brew install openjdk@17 android-commandlinetools` then
-`sdkmanager "platforms;android-34" "build-tools;34.0.0"`; with the newer command-line tools the form is
-`android sdk install platforms/android-34 build-tools/34.0.0`).
+Use issues in **this repository** for this controller/edition. The inherited
+upstream prompt, themes and TV lists remain attributed to
+[CleanYourTV](https://github.com/Gathin23/cleanyourtv); do not send local backend
+support questions to upstream by default.
 
-Ideas that fit the direction: an idle screensaver with clock and ambient colour, per-TV icon packs
-for apps without banners, a settings screen to edit the dock from the TV, localisation.
-Ideas that don't: recommendation rows, content feeds, ads, telemetry.
+## Development workflow
 
-## 3. Improve the prompt and tools
+1. Read [architecture](docs/ARCHITECTURE.md) and the relevant component guide.
+2. Clone the repository and create a focused branch:
 
-`PROMPT.md` is what most people will actually use. If your assistant got stuck somewhere, the fix
-usually belongs in the prompt as one extra sentence, not in a script. Keep it brand-neutral; put
-brand-specific knowledge in `examples/`.
+   ```powershell
+   gh repo clone zangkasi55/tcl-clean-launcher-with-backend
+   Set-Location .\tcl-clean-launcher-with-backend
+   git switch -c docs/clearer-installation
+   ```
 
-`tools/tv.py` and `tools/b64push.py` exist because the stock `adb` is blocked on recent macOS. If
-you find a cleaner workaround, open an issue first.
+3. Set up the [isolated sandbox](docs/BUILD.md#sandbox-development).
+4. Reproduce the issue with fake/synthetic data, then make the smallest
+   complete fix. Preserve unrelated changes and existing behavior.
+5. Add tests appropriate to the behavior change.
+6. Run the relevant checks below and state exactly which passed or were not run.
+7. Review staged files for credentials, runtime data and unintended media.
+8. Commit, push your branch and open a PR:
 
-## 4. Show what you built
+   ```powershell
+   git add docs
+   git commit -m "Clarify installation and recovery instructions"
+   git push -u origin docs/clearer-installation
+   gh pr create --repo zangkasi55/tcl-clean-launcher-with-backend --base main
+   ```
 
-Built your own launcher, a port to another platform, or an add-on that is too big or too personal
-for the shared launcher? Put it in its own repository and add one row to
-[`SHOWCASE.md`](SHOWCASE.md). That page is the place for alternative launchers, forks with a
-different look, and tools around the launcher; this repo keeps one small reference launcher and
-points at everything else. The rules for a row are on that page.
+The `git add docs` example is deliberately scoped. For code changes, stage
+only the intended source/test files; do not blindly add a working data folder.
+If you do not have push access, coordinate an allowed contribution route with
+the owner rather than publishing a private repository elsewhere.
 
-Things that stay in this repo: debloat lists, fixes and small, opt-in features for the reference
-launcher, prompt and tool improvements. Things that go in the showcase: a second launcher, a
-restyle, a platform port, anything with its own background services or network access.
+## Component expectations
 
-## Pull requests
+### Native launcher
 
-- One topic per PR. Small is fine.
-- Say which TV you tested on.
-- No new dependencies in the launcher without discussing it in an issue.
-- Be kind in reviews. Most contributors here are doing this for their parents.
+- Java/Android Views; keep the launcher small and responsive on constrained TVs.
+- Keep D-pad movement deterministic, including first/last rows and app return.
+- Do not add network access, telemetry or a new persistent background service
+  without an explicit design discussion.
+- Keep panel-file I/O off the UI thread and bound reads/resource usage.
+- Preserve lifecycle cancellation, input/Settings access and stock recovery.
+- Put ordinary TV-specific options in configuration rather than scattered
+  device-model checks.
+- Reuse string resources and maintain relevant translations.
+- State actual TV/firmware testing; emulator success is not a compatibility claim.
 
-By contributing you agree your work is released under the repo's MIT licence.
+Existing optional accessibility services and the visible panel reader are part
+of this edition. A blanket upstream rule saying "no background work" does not
+justify removing those scoped behaviors without discussing the consequences.
+
+### Backend and live feeds
+
+- Use strict models and explicit errors, not silent fallbacks or invented data.
+- Preserve app inventory/baseline checks and exact managed package-state recovery.
+- Keep ADB operations serialized and telemetry lower-priority than TV control.
+- Do not expose arbitrary shell commands or bypass origin/CSRF/session checks.
+- Keep passwords, HA tokens and ADB/signing identities outside source and the TV.
+- Preserve usage through restart/midnight; do not charge unknown observation gaps.
+- Test stale/unavailable/offline states, not only happy-path sensor values.
+
+### Browser and photos
+
+- Keep mobile/touch, keyboard, upload retry and same-file reselection working.
+- Keep Save and Apply distinct and wire pending crops into both paths.
+- Retain local conversion and image limits; do not use a CDN conversion service.
+- Preserve self-only script policy and the explicitly allowed local worker.
+- Check portrait/landscape geometry and keep screenshots entirely synthetic.
+
+### Documentation and example configuration
+
+- Use generic domains, addresses and synthetic sample values.
+- Use relative links inside Markdown and link new guides from the hub.
+- Use Mermaid source for diagrams; label any demo screen as simulated.
+- Check commands against the actual source and specify their shell.
+- Do not represent CI, emulation or an illustrative preview as physical testing.
+- Follow the [approved image/data policy](docs/PRIVACY.md).
+
+## Test matrix
+
+Exact setup and commands are in [BUILD.md](docs/BUILD.md).
+
+| Change | Minimum relevant checks |
+|---|---|
+| README, example tables or TV-list docs | Targeted `test_examples.py`; local links/anchors; strict counts when tables change |
+| Other documentation | Links, examples, diagram rendering and affected documentation checks |
+| API/session/access | Focused pytest API/passwordless/management tests and Ruff |
+| Accounting/persistence | Allowance, persistence and sandbox tests; midnight/restart edge cases |
+| Images/photo UI | Python image/API tests, Node crop tests and isolated WebKit photo suite |
+| Energy/weather | Relevant source/topology/feed-quality tests; explicit stale/unavailable checks |
+| Native navigation/layout | JVM tests, Android lint/release build, D-pad/device smoke test |
+| Native HOME/recovery | Backend device/Home tests, policy tests and an approved real-device recovery plan |
+
+The current GitHub CI runs native build/lint/JVM/size checks and upstream
+lists/tools/docs tests. It does **not** run every backend/photo suite. Include
+the missing local results rather than relying solely on a green CI badge.
+Never run write-capable regression tests against production.
+
+## Pull request checklist
+
+- [ ] One coherent topic, with problem, expected behavior and implementation summary.
+- [ ] Tests added/updated; exact commands and results recorded.
+- [ ] Sandbox/emulator/physical-device evidence is identified accurately.
+- [ ] Relevant install, usage, configuration and recovery documentation updated.
+- [ ] No credentials, personal images, keys, private deployment settings or runtime data.
+- [ ] No new Android permission/dependency/service without discussion.
+- [ ] Existing apps, Home recovery and saved data remain preserved.
+- [ ] License/source notices for bundled dependencies remain intact.
+
+## Issues and private reports
+
+Report reproducible bugs at
+[this repository's issue tracker](https://github.com/zangkasi55/tcl-clean-launcher-with-backend/issues).
+Include versions and sanitized text diagnostics. Use generated fixtures or
+approved sandbox screenshots rather than personal backgrounds or full device
+dumps. For a suspected credential leak, revoke/rotate it and contact the
+maintainer privately; do not paste the secret into an issue to demonstrate it.
+
+## Inherited TV lists and themes
+
+The `examples/`, `tools/` and theme helpers come from upstream. They are
+optional, not required by the TCL controller. For a tested TV list:
+
+1. Follow the commented package-per-line format in
+   [the sample list](examples/xiaomi-mi-tv-4a/debloat.txt).
+2. Include model, Android version and firmware, not serial/MAC/network identity.
+3. List only reversible changes you actually tested; never an uninstall list.
+4. Keep the [examples index](examples/README.md) and root README's TV table
+   consistent.
+5. Preserve attribution and clearly separate optional maintenance from this
+   edition's default app-preservation policy.
+
+Theme contributions should use configuration and synthetic demonstrations,
+not personal wallpapers. A new image asset needs explicit review under the
+[privacy policy](docs/PRIVACY.md).
+
+## License
+
+By contributing your project code/docs, you agree to the repository's
+[MIT license](LICENSE). Do not relicense bundled font/decoder assets as MIT:
+their own [font](launcher/FONT-LICENSE-OFL.txt) and
+[HEIC](controller/tvcontrol/static/heic-to-LICENSE.txt) terms/source notices
+remain applicable.

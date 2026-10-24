@@ -172,7 +172,7 @@ def test_templated_card_recovers_the_old_negative_nighttime_sample(tmp_path):
                             tmp_path, lambda: clock[0], sandbox=False)
     try:
         store.put("energy_config", EnergyConfig(enabled=True,
-                  topology_dashboard="nitarn-home", topology_view="Home").model_dump())
+                  topology_dashboard="energy-dashboard", topology_view="Home").model_dump())
         store.put("inventory", {"installed": [LAUNCHER]})
         night = states()
         night["sensor.envoy_122219081316_current_power_production"]["state"] = "-0.001"
@@ -206,7 +206,7 @@ def test_partial_topology_survives_delivery_errors_and_restart_without_fabricate
                             tmp_path, lambda: clock, sandbox=False)
     try:
         store.put("energy_config", EnergyConfig(enabled=True,
-                  topology_dashboard="nitarn-home", topology_view="Home").model_dump())
+                  topology_dashboard="energy-dashboard", topology_view="Home").model_dump())
         store.put("inventory", {"installed": [LAUNCHER]})
         result = service.accept_states(states(), bindings())
         assert result.metrics is None
@@ -262,7 +262,7 @@ def test_backend_reads_dashboard_bindings_and_refreshes_offline_flags_without_ex
             provider = HomeAssistantEnergy("https://ha.example", token)
             provider.monotonic = lambda: clock[0]
             updates = provider.updates(EnergyConfig(enabled=True,
-                topology_dashboard="nitarn-home", topology_view="Home"))
+                topology_dashboard="energy-dashboard", topology_view="Home"))
             try:
                 first = await anext(updates)
                 assert provider.topology_bindings.ess_cloud_offline
@@ -277,8 +277,8 @@ def test_backend_reads_dashboard_bindings_and_refreshes_offline_flags_without_ex
                 await updates.aclose()
 
     asyncio.run(scenario())
-    assert requests[0] == {"id": 1, "type": "lovelace/config", "url_path": "nitarn-home"}
+    assert requests[0] == {"id": 1, "type": "lovelace/config", "url_path": "energy-dashboard"}
     assert requests[1]["type"] == "subscribe_entities"
     assert set(requests[1]["entity_ids"]) == bindings().entities()
-    assert requests[2] == {"id": 3, "type": "lovelace/config", "url_path": "nitarn-home"}
-    assert requests[3] == {"id": 4, "type": "lovelace/config", "url_path": "nitarn-home"}
+    assert requests[2] == {"id": 3, "type": "lovelace/config", "url_path": "energy-dashboard"}
+    assert requests[3] == {"id": 4, "type": "lovelace/config", "url_path": "energy-dashboard"}

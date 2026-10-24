@@ -1,5 +1,10 @@
 # TCL Home Control
 
+Start with the [illustrated user guide](../docs/USER_GUIDE.md), [installation
+checklist](../docs/INSTALLATION.md), or [full documentation hub](../docs/README.md).
+The notes below provide additional implementation details. Example domains and
+dashboard names must be replaced with your own settings.
+
 A separate Synology Container Manager project and a native Android TV launcher.
 It does not modify the Home Assistant container, flash firmware, clear app data,
 or provide package-disabling controls. Explicitly approved maintenance exceptions
@@ -327,7 +332,7 @@ an explicit allowlist of exact HA HTTPS origins. The original
 `TVCONTROL_FRAME_ORIGIN` remains supported. For both home server names use:
 
 ```yaml
-TVCONTROL_FRAME_ORIGINS: "https://nitarnhome.synology.me,https://home.nitarnhome.synology.me"
+TVCONTROL_FRAME_ORIGINS: "https://ha.example.com,https://home.example.com"
 ```
 
 A frame does not inherit HA login. Passwordless mode still needs a same-site
@@ -393,7 +398,8 @@ removes the row and keeps favorites anchored lower down.
 ### Matching the updated HA Energy Distribution card
 
 Device & recovery can bind directly to a dashboard URL path and view title/path.
-The verified home card is on **`nitarn-home` / `Home`**. The controller reads only
+For example, select **`energy-dashboard` / `Home`**, replacing both values with
+your own dashboard and view. The controller reads only
 its declared sensor bindings and quality flags, independently of an inline or
 shared-template renderer; it **never executes dashboard JavaScript**. Cards in
 sections, stacks, and single-card wrappers are supported. Ambiguous cards and
@@ -475,7 +481,7 @@ Use the two sign toggles if your sensors use the reverse convention.
 Flow arrows represent reported import/export/charge/discharge, not inferred allocation
 between individual sources.
 
-Set `TVCONTROL_HA_URL` to the HA origin, such as `https://home.nitarnhome.synology.me`,
+Set `TVCONTROL_HA_URL` to the HA origin, such as `https://ha.example.com`,
 and `TVCONTROL_HA_TOKEN_FILE` to a **container-local read-only token file**. For example,
 a later deployment override can mount a dedicated secret:
 
@@ -483,7 +489,7 @@ a later deployment override can mount a dedicated secret:
 services:
   tvcontrol:
     environment:
-      TVCONTROL_HA_URL: "https://home.nitarnhome.synology.me"
+      TVCONTROL_HA_URL: "https://ha.example.com"
       TVCONTROL_HA_TOKEN_FILE: "/run/secrets/ha-token"
     volumes:
       - "./secrets/ha-token:/run/secrets/ha-token:ro"

@@ -32,3 +32,23 @@ keystore-password.txt
 *.sqlite
 *.sqlite3
 *.db
+initial-admin-password.txt
+private-adb/
+native-home-backup.json
+home-override-backup.json
+# Keep private photos and screenshots out; exceptions are reviewed project assets.
+*.jpg
+*.jpeg
+*.png
+*.webp
+*.heic
+*.heif
+*.gif
+*.bmp
+*.tif
+*.tiff
+!launcher/app/src/main/res/drawable-nodpi/banner.jpg
+!launcher/app/src/main/res/mipmap-xhdpi/ic_launcher.jpg
+!controller/tests/fixtures/iphone-orientation.jpg
+!controller/tests/fixtures/portrait.heic
+!docs/screenshots/*.png

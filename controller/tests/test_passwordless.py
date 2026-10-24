@@ -80,11 +80,11 @@ def test_invalid_auth_flag_cannot_silently_disable_passwords(tmp_path, device, m
 
 def test_multiple_ha_frame_origins_preserve_secure_cookies_and_same_origin_csrf(
         tmp_path, device, monkeypatch):
-    origin = "https://tcl.nitarnhome.synology.me"
+    origin = "https://tv.example.com"
     monkeypatch.setenv("TVCONTROL_PUBLIC_ORIGIN", origin)
-    monkeypatch.setenv("TVCONTROL_FRAME_ORIGIN", "https://home.nitarnhome.synology.me/")
+    monkeypatch.setenv("TVCONTROL_FRAME_ORIGIN", "https://home.example.com/")
     monkeypatch.setenv("TVCONTROL_FRAME_ORIGINS",
-                       "https://nitarnhome.synology.me, https://home.nitarnhome.synology.me")
+                       "https://ha.example.com, https://home.example.com")
     app = create_app(tmp_path, device, require_login=False, secure_cookie=True, run_monitor=False)
     with TestClient(app, base_url=origin) as client:
         response = client.get("/")
@@ -93,15 +93,15 @@ def test_multiple_ha_frame_origins_preserve_secure_cookies_and_same_origin_csrf(
         assert "'unsafe-eval'" not in response.headers["Content-Security-Policy"]
         ancestors = response.headers["Content-Security-Policy"].split("frame-ancestors ")[1]
         assert ancestors == (
-            "'self' https://home.nitarnhome.synology.me https://nitarnhome.synology.me")
+            "'self' https://home.example.com https://ha.example.com")
         bootstrap = client.get("/api/session", headers={"Origin": origin})
         cookie = bootstrap.headers["Set-Cookie"].lower()
         assert "secure" in cookie and "httponly" in cookie and "samesite=strict" in cookie
         client.headers["X-CSRF-Token"] = bootstrap.json()["csrf_token"]
         assert client.put("/api/rule", json={"minutes": 45},
                           headers={"Origin": origin}).status_code == 200
-        for untrusted_origin in ["https://nitarnhome.synology.me",
-                                 "https://home.nitarnhome.synology.me",
+        for untrusted_origin in ["https://ha.example.com",
+                                 "https://home.example.com",
                                  "https://attacker.example"]:
             assert client.put("/api/rule", json={"minutes": 50},
                               headers={"Origin": untrusted_origin}).status_code == 403

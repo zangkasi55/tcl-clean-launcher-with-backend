@@ -15,7 +15,7 @@ powershell -ExecutionPolicy Bypass -File tools\theme.ps1 -TvHost 192.168.1.50 th
 | Theme | What it does |
 |---|---|
 | `default/` | The built-in look written out as JSON, as a starting point for your own |
-| `aurora/` | A dark aurora wallpaper (teal and violet on navy, darker at the bottom) with a matching background colour |
+| `aurora/` | An image-free navy background; add your own private wallpaper if desired |
 | `six-columns/` | Six smaller tiles per row and one grid row visible under the dock |
 
 ## Keys
@@ -52,14 +52,18 @@ Custom tile artwork overrides the app banner and icon only in this launcher; ins
 `energy_panel` controls the lower energy-flow view (enabled by default on this TCL branch).
 Its live values come from the backend's separate local `energy.json` snapshot, never a token
 or an external page in the theme. Missing or stale data is labeled, not replaced with zero.
-The panel is left-aligned and measures roughly 60% of the content width, capped at 480 dp,
-with a 180 dp height. File reads are off the UI thread and unchanged heartbeats do not redraw it.
+The energy card is left-aligned and measures 30% of the entire screen width,
+with a 128 dp height. The optional weather card uses the same dimensions beside it.
+File reads are off the UI thread and unchanged heartbeats do not redraw it.
 The controller validates and resizes images and uploads immutable image files before atomically
 activating their configuration. Original `wallpaper.jpg` themes remain supported.
 
 `wallpaper.jpg` is drawn full screen behind the launcher, centre-cropped. Keep it dark, 1920×1080 and
 under about 300 KB: the text, the hero name and the dock band are designed for black, and a 1 GB TV
 decodes the picture into memory on every Home start. Pictures larger than the screen are downsampled.
+No sample wallpaper is shipped in `aurora/`. To use one privately, place your own
+`wallpaper.jpg` in that folder and set `"wallpaper": true`; do not commit the photo.
+Alternatively, use the controller's [crop/save workflow](../docs/USER_GUIDE.md#choose-and-crop-a-wallpaper).
 
 ## Reduced motion
 
@@ -87,6 +91,8 @@ the plain background; the default is off (the reference launcher looks exactly a
 
 ## Adding a theme
 
-Open a PR with a new folder here, a one-line row in the table above and a screenshot from a real TV
-in the PR description. Keep the dock list generic (the big streaming apps) unless the theme is for a
-specific TV, and say which TV you tried it on.
+Open a PR with a new folder here and a one-line row in the table above. Keep the
+dock list generic unless the theme is for a specific TV, and state what you tested.
+Do not attach personal wallpapers or real household screens. Use a clearly labeled
+synthetic sandbox preview when a picture helps; distinguish it from real-TV evidence.
+Follow the [upload policy](../docs/PRIVACY.md).

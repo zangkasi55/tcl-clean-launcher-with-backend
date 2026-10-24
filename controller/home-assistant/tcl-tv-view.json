@@ -14,7 +14,7 @@
           "icon_height": "28px",
           "tap_action": {
             "action": "url",
-            "url_path": "https://tcl.nitarnhome.synology.me/"
+            "url_path": "https://tv.example.com/"
           },
           "hold_action": {
             "action": "none"
@@ -36,8 +36,8 @@
           },
           "variables": {
             "frame_origins": [
-              "https://nitarnhome.synology.me",
-              "https://home.nitarnhome.synology.me"
+              "https://ha.example.com",
+              "https://home.example.com"
             ]
           },
           "styles": {
@@ -89,7 +89,7 @@
             }
           },
           "custom_fields": {
-            "portal": "[[[ if (!variables.frame_origins.includes(window.location.origin)) return '<div id=\"tcl-embed-guidance\" role=\"status\" style=\"padding:0 16px 20px;line-height:1.6;overflow-wrap:anywhere\"><p>This Home Assistant address cannot display the secure TCL controller inline.</p><p>Tap <strong>Open TCL controls</strong> above to use all controls in a separate page.</p><p>For inline controls in the iPhone Companion app, edit this Home Assistant server under <strong>Settings &gt; Companion app</strong> and use <strong>https://nitarnhome.synology.me</strong> or <strong>https://home.nitarnhome.synology.me</strong> for the Internal URL. Both Home Assistant and the TCL address must be reachable from the phone.</p></div>'; return '<iframe id=\"tcl-control-frame\" title=\"TCL TV controls\" src=\"https://tcl.nitarnhome.synology.me/\" sandbox=\"allow-forms allow-popups allow-pointer-lock allow-same-origin allow-scripts allow-modals allow-downloads\" allow=\"fullscreen\" style=\"display:block;width:100%;height:calc(100vh - 240px);height:calc(100dvh - 240px);min-height:360px;border:0\"></iframe>'; ]]]"
+            "portal": "[[[ if (!variables.frame_origins.includes(window.location.origin)) return '<div id=\"tcl-embed-guidance\" role=\"status\" style=\"padding:0 16px 20px;line-height:1.6;overflow-wrap:anywhere\"><p>This Home Assistant address cannot display the secure TCL controller inline.</p><p>Tap <strong>Open TCL controls</strong> above to use all controls in a separate page.</p><p>For inline controls in the iPhone Companion app, configure your own reachable Home Assistant HTTPS address under <strong>Settings &gt; Companion app</strong>. Replace the example origins in this card and in the controller configuration. Both Home Assistant and the TCL address must be reachable from the phone.</p></div>'; return '<iframe id=\"tcl-control-frame\" title=\"TCL TV controls\" src=\"https://tv.example.com/\" sandbox=\"allow-forms allow-popups allow-pointer-lock allow-same-origin allow-scripts allow-modals allow-downloads\" allow=\"fullscreen\" style=\"display:block;width:100%;height:calc(100vh - 240px);height:calc(100dvh - 240px);min-height:360px;border:0\"></iframe>'; ]]]"
           }
         }
       ]

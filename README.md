@@ -10,6 +10,54 @@ apps, sign-ins and TV settings rather than bulk debloating.
 | Web controller and photo tools | 2.6.23 | [controller/](controller/) |
 | Synology deployment | 2.6.23 | [Dockerfile](Dockerfile), [Compose](docker-compose.yaml) |
 
+## Documentation
+
+Start at the **[documentation hub](docs/README.md)**. The guides below describe
+this TCL edition; the historical upstream guide later on this page is optional.
+
+| I want to... | Guide |
+|---|---|
+| Install the release on my TV and Synology NAS | [Installation and first-run checklist](docs/INSTALLATION.md) |
+| Change wallpaper, favorites, colors or daily limits | [User guide](docs/USER_GUIDE.md) |
+| Understand the components and data flow | [Architecture and diagrams](docs/ARCHITECTURE.md) |
+| See languages, frameworks, versions and limits | [Technology stack](docs/TECH_STACK.md) |
+| Configure HTTPS, access, Home Assistant and iPhone embedding | [Configuration reference](docs/CONFIGURATION.md) |
+| Build the APK/backend and run tests | [Build and development](docs/BUILD.md) |
+| Update, back up, recover or troubleshoot | [Operations and recovery](docs/OPERATIONS.md) |
+| Report a bug, improve docs or submit code | [Contributing](CONTRIBUTING.md) |
+| See safe example screens or the upload policy | [Sample screens](docs/screenshots/README.md), [privacy](docs/PRIVACY.md) |
+
+```mermaid
+flowchart LR
+    Phone["Phone or browser"] -->|HTTPS| Proxy["HTTPS reverse proxy"]
+    Proxy --> Backend["Python / FastAPI controller"]
+    HA["Home Assistant - optional"] -->|WebSocket readings| Backend
+    Backend -->|Authorized ADB on private network| TV["Android TV / Clean Home"]
+    Backend --> Data[("Private persistent data")]
+```
+
+The TV launcher does not browse Home Assistant or receive its token. The
+controller delivers local files to the TV. Existing installed apps and logins
+remain in place; the separately confirmed true-default mode changes only the
+two competing Google HOME package states and keeps those packages installed.
+
+### Try it without a TV
+
+With Python 3.12 or newer installed, run this from the cloned repository in
+PowerShell:
+
+```powershell
+python -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -e '.\controller'
+.\.venv\Scripts\python.exe -m tvcontrol --sandbox
+```
+
+Open **http://127.0.0.1:8790/**. This uses a simulated TV and isolated data; it
+cannot issue real TV commands. Live energy is optional and remains unavailable
+until configured, rather than silently showing invented readings. See the
+[sandbox walkthrough](docs/BUILD.md#sandbox-development) for simulated energy
+and deterministic timer testing.
+
 ## Features
 
 - Native Android HOME, with an explicitly enabled guarded default-launcher mode
@@ -22,6 +70,18 @@ apps, sign-ins and TV settings rather than bulk debloating.
 - iPhone-friendly photo selection, touch/zoom 16:9 cropping and automatic local
   HEIC/HEIF conversion. Save to system and Apply to TV are separate actions.
 - An isolated sandbox and automated native, Python, JavaScript and WebKit tests.
+
+## Sample screens
+
+![Simulated Home preview with a synthetic mountain background, lower favorites and information cards](docs/screenshots/home-preview.png)
+
+*Sandbox browser preview, not a native TV capture. The wallpaper is generated,
+energy values are simulated and no weather forecast is connected.*
+
+The [illustrated manual](docs/USER_GUIDE.md) shows the All apps page, mobile
+crop controls, saved-image confirmation and daily allowance. The
+[installation guide](docs/INSTALLATION.md) includes connection and recovery
+controls. All seven pictures follow the [sample-screen privacy policy](docs/screenshots/README.md).
 
 ## Download and deploy
 
@@ -72,10 +132,6 @@ are not required for this preservation-first TCL deployment.
 ## Upstream CleanYourTV documentation
 
 <p align="center">
-  <a href="https://cleanyour.tv"><img src="https://raw.githubusercontent.com/Gathin23/cleanyourtv/main/docs/banner.png" alt="CleanYourTV. Your TV, minus the ads." width="800"></a>
-</p>
-
-<p align="center">
   <a href="https://cleanyour.tv">cleanyour.tv</a> ·
   <a href="PROMPT.md">The prompt</a> ·
   <a href="examples/">66 TV lists</a> ·
@@ -83,22 +139,11 @@ are not required for this preservation-first TCL deployment.
   <a href="https://x.com/gathint/status/2111379569030939102">The tweet</a>
 </p>
 
-<p align="center">
-  <a href="https://github.com/Gathin23/cleanyourtv/stargazers"><img src="https://img.shields.io/github/stars/Gathin23/cleanyourtv?style=flat&cacheSeconds=1800&color=cfffcf&labelColor=15181e" alt="Stars"></a>
-  <a href="https://github.com/Gathin23/cleanyourtv/pulls?q=is%3Amerged"><img src="https://img.shields.io/github/issues-pr-closed/Gathin23/cleanyourtv?style=flat&cacheSeconds=1800&label=merged%20PRs&color=cfffcf&labelColor=15181e" alt="Merged PRs"></a>
-  <a href="https://github.com/Gathin23/cleanyourtv/network/members"><img src="https://img.shields.io/github/forks/Gathin23/cleanyourtv?style=flat&cacheSeconds=1800&color=cfffcf&labelColor=15181e" alt="Forks"></a>
-  <a href="https://github.com/Gathin23/cleanyourtv/graphs/contributors"><img src="https://img.shields.io/github/contributors/Gathin23/cleanyourtv?style=flat&cacheSeconds=1800&color=cfffcf&labelColor=15181e" alt="Contributors"></a>
-  <a href="LICENSE"><img src="https://img.shields.io/badge/licence-MIT-cfffcf?style=flat&labelColor=15181e" alt="MIT"></a>
-  <a href="https://buymeacoffee.com/gathint"><img src="https://img.shields.io/badge/support-%E2%9D%A4-ff5e8a?style=flat&labelColor=15181e" alt="Support, buy me a coffee"></a>
-</p>
-
 Strip the bloatware from any Android TV or Google TV over Wi-Fi, and replace the ad-filled home
 screen with a clean launcher that looks like an Apple TV. **No root, no cable, nothing uninstalled,
 and a one-line restore if you change your mind.**
 
 <h3 align="center">66 TV models &nbsp;·&nbsp; 25 brands &nbsp;·&nbsp; 14 languages &nbsp;·&nbsp; 300 KB launcher</h3>
-
-![Before: stock Google TV home with a sponsored ad. After: the Clean Your TV launcher](docs/stock-vs-new-side.jpg)
 
 > Vibe coded my parents' TV this afternoon! It was showing a sponsored ad before you could even get
 > to Netflix. Gave Claude Code the model number, it found the TV on wifi, removed 25 Xiaomi packages
@@ -158,14 +203,8 @@ screenshots pulled from the TV. With this repo as context it takes about fifteen
 And a TV that stops working against you: no sponsored rows, no "Discover" nags, no analytics
 phoning home, no apps you never asked for.
 
-| | |
-|---|---|
-| ![The top shelf names the focused app over an ambient glow in its colour](docs/focus-2-up-netflix.png) | ![The Inputs popup: HDMI ports with what is connected, AV and Live TV](docs/inputs-menu.jpg) |
-| *Top shelf and ambient glow* | *Inputs: HDMI with connection state, AV, Live TV* |
-| ![The grid with the glass highlight on a tile and its name beneath](docs/focus-1-fancode.png) | ![The Clock screensaver: a thin clock drifting over the glow](docs/clock-screensaver.png) |
-| *The grid, one glass highlight, the tile's name* | *Clock screensaver, drifts so nothing burns in* |
-| ![The aurora theme: a wallpaper and tinted pills, pushed without a rebuild](docs/theme-aurora.jpg) | ![Six columns and a six-app dock from a theme's config.json](docs/theme-six-columns.jpg) |
-| *Aurora theme, pushed with `tools/theme.sh`* | *Six columns and a six-app dock, same launcher* |
+Inherited demonstration photos have been removed from the current source tree.
+Use this edition's [synthetic sample screens](docs/screenshots/README.md) instead.
 
 ## Supported TVs
 
@@ -391,8 +430,10 @@ playing or the TV reports "No internet" (the resolver is down or unreachable), s
 [jqssun/android-airplay-server](https://github.com/jqssun/android-airplay-server) works; an install
 script for it is in [PR #84](https://github.com/Gathin23/cleanyourtv/pull/84).
 
-**Can I just download the APK?** Build it with the one-line script; it takes a minute and you
-control what goes on your TV. No prebuilt binaries.
+**Can I just download the APK?** This TCL edition publishes a signed APK and
+backend ZIP in [Releases](https://github.com/zangkasi55/tcl-clean-launcher-with-backend/releases/latest).
+You can also [build from source](docs/BUILD.md). The historical upstream
+workflow used local builds rather than this edition's release packages.
 
 ## Contributing
 
@@ -402,16 +443,7 @@ not have to rediscover it. Launcher improvements and sharper prompt wording are 
 top, a launcher, a port, a theme? Add it to [SHOWCASE.md](SHOWCASE.md), where eleven projects already
 live: a webOS port for LG, a Stremio shelf, a Hisense restyle, Fire TV launchers, an AirPlay installer.
 
-The people whose work is in this repo:
-
-<a href="https://github.com/Gathin23/cleanyourtv/graphs/contributors"><img src="https://contrib.rocks/image?repo=Gathin23/cleanyourtv&columns=16" alt="Contributors"></a>
-
-<details>
-<summary><strong>Star history</strong></summary>
-
-<a href="https://star-history.com/#Gathin23/cleanyourtv&Date"><img src="https://api.star-history.com/svg?repos=Gathin23/cleanyourtv&type=Date" alt="Star history chart" width="640"></a>
-
-</details>
+Credit to the [upstream contributors](https://github.com/Gathin23/cleanyourtv/graphs/contributors).
 
 ## Licence
 
