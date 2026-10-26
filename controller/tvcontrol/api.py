@@ -110,6 +110,9 @@ def create_app(
               if secure_cookie is None else secure_cookie)
     public_value = "" if sandbox else os.environ.get("TVCONTROL_PUBLIC_ORIGIN", "")
     public_origin = https_origin(public_value) if public_value else ""
+    ingress_origins = () if sandbox else tuple(dict.fromkeys(
+        https_origin(value.strip())
+        for value in os.environ.get("TVCONTROL_INGRESS_ORIGINS", "").split(",") if value.strip()))
     frame_values = [] if sandbox else [
         os.environ.get("TVCONTROL_FRAME_ORIGIN", ""),
         *os.environ.get("TVCONTROL_FRAME_ORIGINS", "").split(",")]
@@ -216,7 +219,7 @@ def create_app(
     def origin_check(request: Request) -> None:
         origin = request.headers.get("origin")
         expected = public_origin or str(request.base_url).rstrip("/")
-        if origin and origin != expected:
+        if origin and origin not in (expected, *ingress_origins):
             raise HTTPException(403, "Unexpected request origin")
 
     def session(request: Request) -> dict:

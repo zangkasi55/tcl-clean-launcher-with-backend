@@ -1,0 +1,6 @@
+{
+  "type": "custom:tcl-control-card",
+  "title": "TCL TV Control",
+  "addon": "replace_with_installed_tcl_control_slug",
+  "height": 720
+}

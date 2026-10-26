@@ -119,3 +119,49 @@ def test_frame_allowlist_rejects_non_origin_values(tmp_path, device, monkeypatch
     monkeypatch.setenv("TVCONTROL_FRAME_ORIGINS", origin)
     with pytest.raises(ValueError, match="exact HTTPS origins"):
         create_app(tmp_path, device, require_login=False, run_monitor=False)
+
+
+def test_explicit_ingress_origin_keeps_cookie_csrf_and_management_checks(
+        tmp_path, device, monkeypatch):
+    public = "https://tv.example.com"
+    ingress = "https://ha.example.com"
+    monkeypatch.setenv("TVCONTROL_PUBLIC_ORIGIN", public)
+    monkeypatch.setenv("TVCONTROL_INGRESS_ORIGINS", ingress)
+    monkeypatch.setenv("TVCONTROL_FRAME_ORIGINS", "https://read-only.example.com")
+    app = create_app(tmp_path, device, require_login=False, secure_cookie=True, run_monitor=False)
+    with TestClient(app, base_url=public) as client:
+        bootstrap = client.get("/api/session", headers={"Origin": ingress})
+        assert bootstrap.status_code == 200
+        cookie = bootstrap.headers["Set-Cookie"].lower()
+        assert "secure" in cookie and "httponly" in cookie and "samesite=strict" in cookie
+        assert client.put("/api/rule", json={"minutes": 45},
+                          headers={"Origin": ingress}).status_code == 403
+        client.headers["X-CSRF-Token"] = bootstrap.json()["csrf_token"]
+        assert client.put("/api/rule", json={"minutes": 45},
+                          headers={"Origin": ingress}).status_code == 200
+        for origin in ["https://read-only.example.com", "https://attacker.example",
+                       "https://ha.example.com.attacker.example"]:
+            assert client.put("/api/rule", json={"minutes": 50},
+                              headers={"Origin": origin}).status_code == 403
+        assert client.put("/api/rule", json={"minutes": 46},
+                          headers={"Origin": public}).status_code == 200
+        assert app.state.store.rule().minutes == 46
+
+    monkeypatch.setenv("TVCONTROL_MANAGEMENT_NETWORKS", "192.0.2.0/24")
+    restricted = create_app(tmp_path / "restricted", device, require_login=False,
+                            secure_cookie=True, run_monitor=False)
+    with TestClient(restricted, base_url=public) as client:
+        bootstrap = client.get("/api/session", headers={"Origin": ingress})
+        client.headers["X-CSRF-Token"] = bootstrap.json()["csrf_token"]
+        assert client.put("/api/rule", json={"minutes": 50},
+                          headers={"Origin": ingress}).status_code == 403
+
+
+@pytest.mark.parametrize("origin", [
+    "http://ha.example.com", "https://*.example.com", "https://ha.example.com/path",
+    "https://user:password@ha.example.com", "https://ha.example.com?query=yes",
+])
+def test_ingress_origins_are_opt_in_exact_https(tmp_path, device, monkeypatch, origin):
+    monkeypatch.setenv("TVCONTROL_INGRESS_ORIGINS", origin)
+    with pytest.raises(ValueError, match="exact HTTPS origins"):
+        create_app(tmp_path, device, require_login=False, run_monitor=False)

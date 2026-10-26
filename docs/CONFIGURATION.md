@@ -33,6 +33,7 @@ alone does not replace the literal.
 | `TVCONTROL_ADMIN_PASSWORD` | Unset | Optional 12-1,024 character initial admin password. Prefer private generated-password retrieval to putting a secret in configuration history. |
 | `TVCONTROL_SECURE_COOKIE` | `true` | Keep true behind HTTPS. Sandbox forces false on loopback. |
 | `TVCONTROL_PUBLIC_ORIGIN` | Empty unless configured | Exact external HTTPS origin used for write-origin validation. Set this behind a proxy. |
+| `TVCONTROL_INGRESS_ORIGINS` | Empty; opt-in only | Comma-separated exact HTTPS HA browser origins accepted through an authenticated ingress app. Does not disable session, CSRF or management checks. |
 | `TVCONTROL_FRAME_ORIGINS` | Empty | Comma-separated exact HTTPS HA origins allowed to frame the portal. No paths or wildcards. |
 | `TVCONTROL_FRAME_ORIGIN` | Empty | Backward-compatible single-origin setting, combined with the list. |
 | `TVCONTROL_MANAGEMENT_NETWORKS` | Empty | Optional comma-separated parent-device IP/CIDR allowlist for API writes. |
@@ -168,7 +169,23 @@ tap_action:
 This is the preferred fallback when embedding is blocked. The phone must
 reach the controller hostname as well as HA; reaching HA alone is insufficient.
 
-### Optional inline view
+### Authenticated inline controls on the main Home tab
+
+For Supervisor installations, the recommended
+[TCL Control ingress app](../home-assistant/tcl_control/DOCS.md) keeps the NAS
+controller LAN-only while making its complete interface available inside HA,
+including from outside home. It authenticates through HA and explicitly
+authorizes the configured HA user IDs. No HA long-lived token is copied.
+
+The supplied [TCL control card](../controller/home-assistant/tcl-control-card.js)
+uses a scrollable iframe without a button-card gesture wrapper, adapts to
+mobile viewports, and offers an authenticated full-screen view. Add it to the
+existing **Home** view after backing up the dashboard; preserve all other cards
+and energy templates. Follow the app's setup steps, including the explicit
+`TVCONTROL_INGRESS_ORIGINS` setting. That setting is separate from read-only
+frame permission; it never disables CSRF or relaxes cookies.
+
+### Legacy LAN-only inline view
 
 Use exact HTTPS origins on the same site where possible:
 

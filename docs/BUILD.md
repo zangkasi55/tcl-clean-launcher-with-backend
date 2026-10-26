@@ -131,17 +131,22 @@ Then, in another terminal from the repository root:
 npm --prefix .\controller exec -- playwright-core install webkit
 $env:TCL_PHOTO_TEST_URL = 'http://127.0.0.1:18796'
 $env:TCL_HA_TEST_URL = 'http://127.0.0.1:18796'
-node --test --test-concurrency=1 .\controller\tests\ha-cards.webkit.mjs .\controller\tests\photo-upload.webkit.mjs
+node --test --test-concurrency=1 .\controller\tests\ha-cards.webkit.mjs .\controller\tests\photo-upload.webkit.mjs .\controller\tests\ha-embedding.webkit.mjs
 ```
 
-Both browser runners refuse writes unless status explicitly reports
+The browser runners refuse writes unless status explicitly reports
 `sandbox.real_device_access === false`. It tests repeated saving/reloading,
 EXIF rotation, large source preparation, actual HEIC/HEIF fallback decoding,
 crop behavior, failure/retry and mobile orientation. The fixtures are original
 synthetic patterns, not personal photos. Direct-mapping tests also verify
 saved-only transfer, visible transport errors, unsaved edits surviving polling
 and unrelated saves, and separation from backend/theme/HOME/installation.
-Run the two suites sequentially when they share a sandbox. Stop it when done.
+Embedding tests additionally cover lower-form scroll reachability in mobile
+WebKit, all three sections, portrait crop access, HA polling/ingress renewal,
+and visible connection errors with retry. WebKit's mobile automation does not
+support a native wheel/swipe; these checks do not claim physical iPhone touch
+acceptance. Verify a real touch drag separately. Run the suites sequentially
+when they share a sandbox. Stop it when done.
 
 The npm scripts use portable paths. On macOS/Linux, equivalent direct entry
 points from `controller/` after `npm ci` are:
@@ -149,11 +154,30 @@ points from `controller/` after `npm ci` are:
 ```bash
 node --test tests/photo-tools.test.mjs
 npx playwright-core install webkit
-TCL_HA_TEST_URL=http://127.0.0.1:18796 TCL_PHOTO_TEST_URL=http://127.0.0.1:18796 node --test --test-concurrency=1 tests/ha-cards.webkit.mjs tests/photo-upload.webkit.mjs
+TCL_HA_TEST_URL=http://127.0.0.1:18796 TCL_PHOTO_TEST_URL=http://127.0.0.1:18796 node --test --test-concurrency=1 tests/ha-cards.webkit.mjs tests/photo-upload.webkit.mjs tests/ha-embedding.webkit.mjs
 node ../scripts/vendor-photo-converter.mjs
 ```
 
 The separate sandbox server must still be running at that address.
+
+## Home Assistant ingress app tests
+
+From the repository root, with the controller development environment:
+
+```powershell
+.\.venv\Scripts\python.exe -m pip install -r .\home-assistant\tcl_control\requirements.txt
+.\.venv\Scripts\python.exe -m unittest discover -s .\home-assistant\tcl_control -p test_proxy.py -v
+.\.venv\Scripts\python.exe -m ruff check .\home-assistant\tcl_control
+node --check .\controller\home-assistant\tcl-control-card.js
+```
+
+These tests use an isolated synthetic upstream, never the NAS or HA. They
+verify ingress-peer and per-user authorization, exact HTTPS configuration,
+unchanged Origin/CSRF forwarding, credential filtering, cookie path/security,
+streaming events, restricted redirects and bounded uploads with explicit
+413 errors. The normal 8 MiB prepared-image size still fits through the app.
+See [installation](../home-assistant/tcl_control/DOCS.md) for actual Supervisor
+deployment, which requires no exposed host port.
 
 ## Native launcher: contributor build
 

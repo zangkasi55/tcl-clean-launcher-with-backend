@@ -29,6 +29,7 @@ this TCL edition; the historical upstream guide later on this page is optional.
 | Understand the components and data flow | [Architecture and diagrams](docs/ARCHITECTURE.md) |
 | See languages, frameworks, versions and limits | [Technology stack](docs/TECH_STACK.md) |
 | Configure HTTPS, access, Home Assistant and iPhone embedding | [Configuration reference](docs/CONFIGURATION.md) |
+| Use full TCL controls on HA's Home tab without publishing the LAN portal | [Authenticated HA ingress app](home-assistant/tcl_control/DOCS.md) |
 | Connect Energy, Haval and Weather straight from the TV to HA | [Direct-HA setup and rollback](docs/DIRECT_HA.md) |
 | Build the APK/backend and run tests | [Build and development](docs/BUILD.md) |
 | Update, back up, recover or troubleshoot | [Operations and recovery](docs/OPERATIONS.md) |
@@ -39,6 +40,8 @@ this TCL edition; the historical upstream guide later on this page is optional.
 flowchart LR
     Phone["Phone or browser"] -->|HTTPS| Proxy["HTTPS reverse proxy"]
     Proxy --> Backend["Python / FastAPI controller"]
+    Phone -->|Optional authenticated HA Home card| Ingress["HA ingress / user allowlist"]
+    Ingress -->|Private HTTPS| Proxy
     Backend -->|Management and credential-free mappings over private ADB| TV["Android TV / Clean Home"]
     TV <-->|Optional direct authenticated WSS| HA["Home Assistant"]
     HA -->|Optional backend readings for previews and explicit rollback| Backend

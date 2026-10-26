@@ -34,6 +34,8 @@ flowchart TB
     end
 
     User -->|HTTPS| Proxy
+    User -->|Optional authenticated HA Home card| Ingress["HA Supervisor ingress + explicit user allowlist"]
+    Ingress -->|Private HTTPS; real Origin + CSRF| Proxy
     Proxy -->|Host loopback port 8787| API
     API <--> Data
     Monitor <--> Data
@@ -75,6 +77,7 @@ Paths are relative to the repository root.
 | Accounting and enforcement | [monitor.py](../controller/tvcontrol/monitor.py) |
 | Live data and direct mappings | [energy.py](../controller/tvcontrol/energy.py), [energy_topology.py](../controller/tvcontrol/energy_topology.py), [weather.py](../controller/tvcontrol/weather.py), [vehicle.py](../controller/tvcontrol/vehicle.py), [ha_cards.py](../controller/tvcontrol/ha_cards.py) |
 | Browser UI and photos | [app.js](../controller/tvcontrol/static/app.js), [photo-tools.js](../controller/tvcontrol/static/photo-tools.js), [images.py](../controller/tvcontrol/images.py) |
+| Optional authenticated HA management UI | [Ingress app](../home-assistant/tcl_control/proxy.py), [scrollable Home card](../controller/home-assistant/tcl-control-card.js), [setup](../home-assistant/tcl_control/DOCS.md) |
 | Offline development | [sandbox.py](../controller/tvcontrol/sandbox.py), [controller tests](../controller/tests/) |
 | Packaging | [Dockerfile](../Dockerfile), [build-launcher.ps1](../scripts/build-launcher.ps1), [package-synology.py](../scripts/package-synology.py) |
 

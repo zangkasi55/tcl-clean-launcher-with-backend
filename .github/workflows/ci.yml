@@ -66,12 +66,16 @@ jobs:
       - name: Development dependencies
         run: |
           python -m pip install -e './controller[test]'
+          python -m pip install -r home-assistant/tcl_control/requirements.txt
           npm --prefix controller ci --ignore-scripts
       - name: Controller and photo unit tests
         run: |
           python -m pytest controller/tests -q
           python -m ruff check controller
+          python -m unittest discover -s home-assistant/tcl_control -p test_proxy.py -v
+          python -m ruff check home-assistant/tcl_control
           node --check controller/tvcontrol/static/app.js
+          node --check controller/home-assistant/tcl-control-card.js
           npm --prefix controller run test:photos
       - name: WebKit runtime
         working-directory: controller
@@ -102,7 +106,7 @@ jobs:
             cat "$RUNNER_TEMP/tcl-webkit-sandbox.log"
             exit 1
           fi
-          node --test --test-concurrency=1 controller/tests/ha-cards.webkit.mjs controller/tests/photo-upload.webkit.mjs
+          node --test --test-concurrency=1 controller/tests/ha-cards.webkit.mjs controller/tests/photo-upload.webkit.mjs controller/tests/ha-embedding.webkit.mjs
 
   release-safety:
     name: Windows release acceptance

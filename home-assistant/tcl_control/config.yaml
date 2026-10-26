@@ -1,0 +1,29 @@
+name: TCL Control
+version: 1.0.0
+slug: tcl_control
+description: Authenticated Home Assistant ingress for a private TCL controller
+url: https://github.com/zangkasi55/tcl-clean-launcher-with-backend
+arch:
+  - aarch64
+  - amd64
+  - armv7
+init: false
+startup: application
+boot: auto
+ingress: true
+ingress_port: 8099
+ingress_stream: true
+panel_icon: mdi:television
+panel_title: TCL Control
+panel_admin: true
+options:
+  backend_url: https://tv.example.com
+  browser_origins:
+    - https://ha.example.com
+  allowed_user_ids: []
+schema:
+  backend_url: url
+  browser_origins:
+    - url
+  allowed_user_ids:
+    - str
