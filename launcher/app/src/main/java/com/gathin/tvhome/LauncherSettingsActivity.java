@@ -12,6 +12,7 @@ import android.widget.Toast;
 
 /** Remote-friendly settings owned by the launcher; system settings stay one row away. */
 public final class LauncherSettingsActivity extends Activity {
+    private static final int HA_SETTINGS = 12;
     private SharedPreferences choices;
     private final TextView[] columnChoices = new TextView[4];
     private TextView animationsChoice;
@@ -82,8 +83,15 @@ public final class LauncherSettingsActivity extends Activity {
         });
         findViewById(R.id.tvSettingsChoice).setOnClickListener(v ->
                 open(new Intent(Settings.ACTION_SETTINGS)));
+        findViewById(R.id.haSettingsChoice).setOnClickListener(v ->
+                startActivityForResult(new Intent(this, HaSettingsActivity.class), HA_SETTINGS));
         refresh();
         columnChoices[Math.max(0, Math.min(columns - 4, 3))].requestFocus();
+    }
+
+    @Override protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode == HA_SETTINGS && resultCode == RESULT_OK) setResult(RESULT_OK);
     }
 
     private void setAdvanced(boolean enabled) {

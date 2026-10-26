@@ -16,8 +16,8 @@ android {
         applicationId 'com.gathin.tvhome'
         minSdk 26
         targetSdk 34
-        versionCode 17
-        versionName '2.6.18-tcl'
+        versionCode 20
+        versionName '2.6.26-tcl'
     }
 
     signingConfigs {
@@ -50,12 +50,19 @@ android {
         sourceCompatibility JavaVersion.VERSION_17
         targetCompatibility JavaVersion.VERSION_17
     }
+    testOptions.unitTests.includeAndroidResources = true
+    testOptions.unitTests.all {
+        // Robolectric 4.14 otherwise omits WindowManager's visible-app flag.
+        systemProperty 'robolectric.areWindowsMarkedVisible', 'true'
+    }
     sourceSets.main.assets.srcDir layout.buildDirectory.dir('generated/licenseAssets')
+    sourceSets.test.resources.srcDir rootProject.file('../controller/tests/fixtures')
 }
 
 def copyLicenseNotices = tasks.register('copyLicenseNotices', Copy) {
     from rootProject.file('../LICENSE')
     from rootProject.file('FONT-LICENSE-OFL.txt')
+    from rootProject.file('THIRD-PARTY-NOTICES.txt')
     into layout.buildDirectory.dir('generated/licenseAssets/licenses')
 }
 tasks.named('preBuild').configure { dependsOn copyLicenseNotices }
@@ -63,6 +70,10 @@ tasks.named('preBuild').configure { dependsOn copyLicenseNotices }
 dependencies {
     implementation 'androidx.recyclerview:recyclerview:1.3.2'
     implementation 'androidx.dynamicanimation:dynamicanimation:1.0.0'
-    // Test only (never in the APK): plain JVM tests for the module card validators, src/test.
+    implementation 'org.java-websocket:Java-WebSocket:1.6.0'
+    implementation 'org.slf4j:slf4j-nop:2.0.13'
+    // Test only; none of these dependencies are packaged in the APK.
     testImplementation 'junit:junit:4.13.2'
+    testImplementation 'org.json:json:20240303'
+    testImplementation 'org.robolectric:robolectric:4.14.1'
 }

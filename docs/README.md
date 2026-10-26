@@ -3,8 +3,11 @@
 [Project home](../README.md) | [Downloads](https://github.com/zangkasi55/tcl-clean-launcher-with-backend/releases/latest) | [Contributing](../CONTRIBUTING.md)
 
 These guides cover **TCL Clean Launcher with Backend**, not a universal
-one-click debloating tool. They describe the source published with controller
-**2.6.23** and native launcher **2.6.18-tcl**. The Android launcher, controller
+one-click debloating tool. They describe current **2.6.26** controller source
+and native launcher **2.6.26-tcl**. Direct-HA is a source candidate awaiting
+physical-TV acceptance, not an already deployed or packaged release.
+The existing **v2.6.23** download contains native **2.6.18-tcl** and lacks
+direct-HA support. The Android launcher, controller
 bundle and Python package metadata use different version numbers; see the
 [version explanation](TECH_STACK.md#versions-and-sources-of-truth).
 
@@ -15,13 +18,16 @@ bundle and Python package metadata use different version numbers; see the
 1. Read [requirements, downloads and installation](INSTALLATION.md).
 2. Complete its first-run acceptance checklist before changing default Home.
 3. Follow the [user guide](USER_GUIDE.md) for wallpaper, app layout and limits.
-4. Add optional Home Assistant feeds using [configuration](CONFIGURATION.md).
+4. Add optional Home Assistant feeds using [configuration](CONFIGURATION.md);
+   use [direct-HA setup](DIRECT_HA.md) for the new source candidate.
 5. Keep [backup, recovery and troubleshooting](OPERATIONS.md) available.
 
-The manual and installation guide include seven
+The guides include eight
 [safe example screens](screenshots/README.md), including mobile cropping and
 the separate save/apply steps. These are labeled sandbox examples, not
 personal TV photos or physical-iPhone test results.
+The original seven show 2.6.23; the direct-mapping panel shows the 2.6.26
+source candidate and is not proof of TV installation or authentication.
 
 You do not need Java, Gradle, Node.js or an Android SDK to deploy the release
 ZIP on a compatible NAS. Its image is built locally from the included APK,
@@ -48,6 +54,7 @@ iPhone behavior still need explicitly identified real-device testing.
 | [Architecture](ARCHITECTURE.md) | System diagram, module map, persistence, photo sequence, telemetry and HOME recovery |
 | [Tech stack](TECH_STACK.md) | Java/Android, Python, browser code, dependencies, tooling and design constraints |
 | [Configuration](CONFIGURATION.md) | Environment variables, saved-setting precedence, authentication, HA secrets and iPhone embedding |
+| [Direct HA](DIRECT_HA.md) | TV-only credentials, non-secret mappings, Energy/Haval/Weather setup, validation and explicit rollback |
 | [Build](BUILD.md) | Developer setup, Windows and Unix commands, testing, signing, Docker image and ZIP creation |
 | [Operations](OPERATIONS.md) | Updates, private backups, restore procedures, symptoms and diagnostic information |
 | [Contributing](../CONTRIBUTING.md) | Access, issues, branches, PRs, test matrix, licensing and good first tasks |
@@ -68,10 +75,11 @@ than treating them as ready-made configuration for another home.
   NAS feature, **not an independent on-TV watchdog**.
 - Password-free mode is suitable only behind a trusted private access boundary.
   Do not expose the portal or ADB to the public internet.
-- Home Assistant is optional. The native launcher does not hold its token.
-- The repository is currently private. People need repository access before
-  they can clone it, download releases or submit work; visibility is the owner's
-  decision.
+- Home Assistant is optional. Direct mode stores a dedicated encrypted token
+  only on the TV; backend mode keeps its separate token on the NAS.
+- The source repository is public; private household settings, credentials
+  and media are excluded. Issues/PRs require a GitHub account, and direct
+  writes/releases remain maintainer-controlled.
 
 ## Licensing
 

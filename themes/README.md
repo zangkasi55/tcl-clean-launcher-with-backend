@@ -50,11 +50,16 @@ The TCL controller build also accepts `app_order` (full package/activity compone
 It shows ordinary launcher entries as well as TV entries, without merging distinct aliases.
 Custom tile artwork overrides the app banner and icon only in this launcher; installed APKs are untouched.
 `energy_panel` controls the lower energy-flow view (enabled by default on this TCL branch).
-Its live values come from the backend's separate local `energy.json` snapshot, never a token
-or an external page in the theme. Missing or stale data is labeled, not replaced with zero.
+Its readings come from the separately selected direct-HA connection or backend
+`energy.json` snapshot, never a token or an external page in the theme.
+Missing or stale data is labeled, not replaced with zero.
 The energy card is left-aligned and measures 30% of the entire screen width,
-with a 128 dp height. The optional weather card uses the same dimensions beside it.
-File reads are off the UI thread and unchanged heartbeats do not redraw it.
+with a 128 dp height. The read-only Haval card occupies exactly 10% of full-screen
+width between Energy and the optional 30%-width Weather card.
+Backend file reads stay off the UI thread; direct WSS ownership follows visible
+cards and disconnects while hidden. Unchanged heartbeats do not redraw cards.
+Source and credentials are not theme properties: use the separate
+[direct-HA mapping/TV setup](../docs/DIRECT_HA.md).
 The controller validates and resizes images and uploads immutable image files before atomically
 activating their configuration. Original `wallpaper.jpg` themes remain supported.
 

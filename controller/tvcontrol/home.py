@@ -1,12 +1,13 @@
 import logging
 import re
+import shlex
 import time
 from collections.abc import Callable
 from datetime import datetime
 from pathlib import Path
 from typing import Literal
 
-from pydantic import Field, StrictInt, ValidationError, field_validator
+from pydantic import Field, StrictBool, StrictInt, ValidationError, field_validator
 
 from .models import LAUNCHER, ORIGINAL_HOME, Model, canonical_component
 from .monitor import DeviceError
@@ -16,6 +17,7 @@ STOCK_HOME = ORIGINAL_HOME.split("/")[0]
 SETUP_HOME = "com.google.android.tungsten.setupwraith"
 HOME_PACKAGES = (STOCK_HOME, SETUP_HOME)
 CLEAN_HOME = canonical_component(f"{LAUNCHER}/.MainActivity")
+REMOTE_KEY_SERVICE = f"{LAUNCHER}/.HomeKeyService"
 
 
 class HomeBackup(Model):
@@ -39,6 +41,11 @@ class HomeBackup(Model):
         if set(value) != set(HOME_PACKAGES) or any(state not in {0, 1} for state in value.values()):
             raise ValueError("Expected the two original enabled Google TV package states")
         return value
+
+
+class RemoteKeysBackup(Model):
+    added: StrictBool
+    accessibility: Literal["0", "1"]
 
 
 def exit_records(raw: str) -> list[tuple[str, datetime, int]]:
@@ -71,6 +78,7 @@ class NativeHome:
         self.shell = shell
         self.recovered = recovered
         self.path = data_dir / "native-home-backup.json"
+        self.keys_path = data_dir / "native-remote-keys.json"
         self.next_check = 0.0
         self.missing_since: float | None = None
         self.error: str | None = None
@@ -146,6 +154,7 @@ class NativeHome:
     def activate(self, backup: HomeBackup) -> None:
         self.write(backup)
         try:
+            self._enable_remote_keys()
             # Remove the recovery HOME candidate before Google Home to avoid a setup crash loop.
             for package in reversed(HOME_PACKAGES):
                 self.shell("pm disable-user --user 0 " + package)
@@ -182,6 +191,7 @@ class NativeHome:
         self.shell("cmd package set-home-activity --user 0 " + backup.original_home)
         if self.resolve() != backup.original_home:
             raise DeviceError("Original Home packages were restored but HOME resolution is unverified.")
+        self._restore_remote_keys()
         backup.phase = "fallback" if automatic else "restored"
         self.write(backup)
         self.error = None
@@ -220,6 +230,7 @@ class NativeHome:
                 self.restore("Clean Home was unavailable for at least 15 seconds.", automatic=True)
             return
         self.missing_since = None
+        self._enable_remote_keys()
         raw = self.shell(f"date '+%Y-%m-%d %H:%M:%S'; dumpsys activity exit-info {LAUNCHER}")
         stamp, separator, exits = raw.partition("\n")
         try:
@@ -234,6 +245,71 @@ class NativeHome:
             self.restore("Clean Home stopped responding (Android ANR).", automatic=True)
         elif sum(reason in {4, 5} for reason in recent) >= 3:
             self.restore("Clean Home crashed three times within two minutes.", automatic=True)
+
+    @staticmethod
+    def _is_remote_key_service(value: str) -> bool:
+        return value in {REMOTE_KEY_SERVICE, f"{LAUNCHER}/{LAUNCHER}.HomeKeyService"}
+
+    def _remote_services(self) -> list[str]:
+        raw = self.shell("settings get secure enabled_accessibility_services")
+        return [] if raw in {"", "null"} else raw.split(":")
+
+    def _read_remote_keys_backup(self) -> RemoteKeysBackup | None:
+        if not self.keys_path.exists():
+            return None
+        try:
+            return RemoteKeysBackup.model_validate_json(self.keys_path.read_text(encoding="utf-8"))
+        except (OSError, ValidationError) as exc:
+            raise DeviceError("The remote-button recovery backup cannot be read or is invalid.") from exc
+
+    def _enable_remote_keys(self) -> None:
+        services = self._remote_services()
+        selected = any(self._is_remote_key_service(value) for value in services)
+        enabled = self.shell("settings get secure accessibility_enabled")
+        if enabled not in {"0", "1"}:
+            raise DeviceError("Cannot verify accessibility for the remote Settings button.")
+        if enabled == "0" and any(not self._is_remote_key_service(value) for value in services):
+            raise DeviceError("Other accessibility services are selected but disabled. Review them "
+                              "on the TV before enabling native Home remote support.")
+        if self._read_remote_keys_backup() is None:
+            saved = RemoteKeysBackup(added=not selected, accessibility=enabled)
+            temporary = self.keys_path.with_suffix(".pending.json")
+            try:
+                temporary.write_text(saved.model_dump_json(), encoding="utf-8")
+                temporary.replace(self.keys_path)
+            except OSError as exc:
+                raise DeviceError("The remote-button recovery state could not be saved.") from exc
+        if not selected:
+            self.shell("settings put secure enabled_accessibility_services "
+                       + shlex.quote(":".join([*services, REMOTE_KEY_SERVICE])))
+        if enabled != "1":
+            self.shell("settings put secure accessibility_enabled 1")
+        if (not any(self._is_remote_key_service(value) for value in self._remote_services())
+                or self.shell("settings get secure accessibility_enabled") != "1"):
+            raise DeviceError("The TV did not enable its remote Settings-button service.")
+
+    def _restore_remote_keys(self) -> None:
+        backup = self._read_remote_keys_backup()
+        if backup is None:
+            return
+        services = self._remote_services()
+        if backup.added:
+            others = [value for value in services if not self._is_remote_key_service(value)]
+            if others != services:
+                self.shell("settings put secure enabled_accessibility_services "
+                           + shlex.quote(":".join(others)))
+            if any(self._is_remote_key_service(value) for value in self._remote_services()):
+                raise DeviceError("Remote Settings-button service restoration is pending.")
+            services = others
+        if backup.accessibility == "0" and not any(
+                not self._is_remote_key_service(value) for value in services):
+            self.shell("settings put secure accessibility_enabled 0")
+            if self.shell("settings get secure accessibility_enabled") != "0":
+                raise DeviceError("Original accessibility-state restoration is pending.")
+        try:
+            self.keys_path.unlink()
+        except OSError as exc:
+            raise DeviceError("The restored remote-button recovery state could not be removed.") from exc
 
 
 def managed_home_packages(inventory: dict) -> frozenset[str]:

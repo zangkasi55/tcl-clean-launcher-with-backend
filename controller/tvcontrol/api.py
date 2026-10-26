@@ -16,7 +16,7 @@ from zoneinfo import ZoneInfo
 from fastapi import Depends, FastAPI, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse, JSONResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import Field
+from pydantic import Field, ValidationError
 
 from .auth import Auth
 from .device import Device, approved_disabled_packages, assert_preserved, private_address
@@ -28,6 +28,7 @@ from .energy import (
     EnergyService,
     LiveEnergyInput,
 )
+from .ha_cards import DirectHaCards
 from .images import MAX_UPLOAD, save_image
 from .models import (
     ASSET,
@@ -43,6 +44,7 @@ from .models import (
 from .monitor import DeviceError, Monitor
 from .sandbox import SandboxAdvance, SandboxDevice, SandboxStateUpdate
 from .store import Store
+from .vehicle import VehicleConfig, VehicleData, VehicleService
 from .weather import WeatherConfig, WeatherData, WeatherService
 
 logger = logging.getLogger(__name__)
@@ -141,6 +143,7 @@ def create_app(
     energy = EnergyService(store, device, data_dir, monitor.now, sandbox=sandbox,
                           default_config=energy_defaults)
     weather = WeatherService(store, device, monitor.now, sandbox=sandbox)
+    vehicle = VehicleService(store, device, monitor.now, sandbox=sandbox)
     operations = threading.RLock()
     image_slots = asyncio.Semaphore(1)
     assets = data_dir / "assets"
@@ -154,16 +157,19 @@ def create_app(
         energy_worker = asyncio.create_task(energy.run(stop)) if run_monitor else None
         delivery_worker = asyncio.create_task(energy.deliver(stop)) if run_monitor else None
         weather_worker = asyncio.create_task(weather.run(stop)) if run_monitor else None
+        vehicle_worker = asyncio.create_task(vehicle.run(stop)) if run_monitor else None
         app.state.worker = worker
         app.state.energy_worker = energy_worker
         app.state.delivery_worker = delivery_worker
         app.state.weather_worker = weather_worker
+        app.state.vehicle_worker = vehicle_worker
         try:
             yield
         finally:
             stop.set()
             try:
-                tasks = [task for task in [worker, energy_worker, delivery_worker, weather_worker]
+                tasks = [task for task in [worker, energy_worker, delivery_worker, weather_worker,
+                                          vehicle_worker]
                          if task is not None]
                 results = await asyncio.gather(*tasks, return_exceptions=True)
                 for result in results:
@@ -172,6 +178,7 @@ def create_app(
             finally:
                 energy.checkpoint()
                 weather.checkpoint()
+                vehicle.checkpoint()
                 device.close()
                 store.close()
 
@@ -180,6 +187,7 @@ def create_app(
     app.state.store, app.state.monitor, app.state.device = store, monitor, device
     app.state.energy = energy
     app.state.weather = weather
+    app.state.vehicle = vehicle
 
     @app.middleware("http")
     async def headers(request: Request, call_next):
@@ -269,7 +277,7 @@ def create_app(
 
     @app.get("/healthz")
     def health():
-        for name in ["worker", "energy_worker", "delivery_worker", "weather_worker"]:
+        for name in ["worker", "energy_worker", "delivery_worker", "weather_worker", "vehicle_worker"]:
             worker = getattr(app.state, name, None)
             if worker is not None and worker.done():
                 logger.error("The %s stopped unexpectedly", name, exc_info=worker.exception())
@@ -339,6 +347,8 @@ def create_app(
             "energy_delivery_error": energy.delivery_error,
             "weather": weather.snapshot().wire(),
             "weather_delivery_error": weather.delivery_error,
+            "vehicle": vehicle.snapshot().wire(),
+            "vehicle_delivery_error": vehicle.delivery_error,
             "home_recovery_error": device.home_recovery_error,
             "native_home": native_home,
             "login_required": require_login,
@@ -371,6 +381,46 @@ def create_app(
             monitor.forget_interval()
         return {"host": address}
 
+    def saved_ha_cards() -> dict:
+        document = store.get("ha_cards")
+        if document is None:
+            raise HTTPException(409, "Save direct HA card mappings before exporting or sending them")
+        try:
+            return DirectHaCards.model_validate(document).model_dump()
+        except ValidationError:
+            logger.warning("invalid_saved_ha_cards")
+            raise HTTPException(409, "Saved direct HA mappings are invalid; save them again") from None
+
+    @app.get("/api/ha/cards", dependencies=[Depends(session)])
+    def ha_cards():
+        with operations:
+            saved = store.get("ha_cards") is not None
+            return {"saved": saved, "config": saved_ha_cards() if saved else None}
+
+    @app.put("/api/ha/cards", dependencies=[Depends(session)])
+    def ha_cards_update(body: DirectHaCards):
+        document = body.model_dump()
+        with operations:
+            store.put("ha_cards", document)
+        return {"saved": True, "config": document}
+
+    @app.get("/api/ha/cards/export", dependencies=[Depends(session)])
+    def ha_cards_export():
+        with operations:
+            return JSONResponse(saved_ha_cards(), headers={
+                "Content-Disposition": 'attachment; filename="ha-cards.json"'})
+
+    @app.post("/api/ha/cards/send", dependencies=[Depends(session)])
+    def ha_cards_send():
+        with operations:
+            document = saved_ha_cards()
+            if device.simulation:
+                raise HTTPException(409, "Direct HA mappings cannot be sent to a simulated TV")
+            if not device.publish_ha_cards(document):
+                raise HTTPException(409, "TV is busy or offline; mappings remain saved. Retry Send.")
+        store.event("ha_cards_sent", "Sent non-secret direct HA card mappings; TV source unchanged")
+        return {"sent": True, "credentials_transferred": False, "source_changed": False}
+
     @app.get("/api/energy/config", dependencies=[Depends(session)])
     def energy_config():
         return {"config": energy.config().model_dump(), "simulation": sandbox,
@@ -391,6 +441,22 @@ def create_app(
             store.put("weather_config", body.model_dump())
             snapshot = weather.poll()
         return {"config": body.model_dump(), "weather": snapshot.wire()}
+
+    @app.get("/api/vehicle/config", dependencies=[Depends(session)])
+    def vehicle_config():
+        return {"config": vehicle.config().model_dump(), "simulation": sandbox,
+                "token_configured": bool(os.environ.get("TVCONTROL_HA_URL")
+                                         and os.environ.get("TVCONTROL_HA_TOKEN_FILE"))}
+
+    @app.put("/api/vehicle/config", dependencies=[Depends(session)])
+    def vehicle_config_update(body: VehicleConfig):
+        if not sandbox and body.transport != "websocket":
+            raise HTTPException(422, "Real-TV vehicle readings require the backend Home Assistant feed")
+        with vehicle.lock:
+            changed = vehicle.config() != body
+            store.put("vehicle_config", body.model_dump())
+            snapshot = vehicle.poll() if changed else vehicle.snapshot()
+        return {"config": body.model_dump(), "vehicle": snapshot.wire()}
 
     @app.put("/api/energy/config", dependencies=[Depends(session)])
     def energy_config_update(body: EnergyConfig):
@@ -569,6 +635,14 @@ def create_app(
         return {"standby_requested": requested, "confirmed": False}
 
     if sandbox:
+        @app.put("/api/sandbox/vehicle", dependencies=[Depends(session)])
+        def sandbox_vehicle(body: VehicleData):
+            if vehicle.config().transport != "simulation":
+                raise HTTPException(409, "Simulation cannot overwrite the live vehicle feed")
+            with vehicle.lock:
+                store.put("sandbox_vehicle_data", body.model_dump(mode="json"))
+                return vehicle.poll().wire()
+
         @app.put("/api/sandbox/weather", dependencies=[Depends(session)])
         def sandbox_weather(body: WeatherData):
             if weather.config().transport != "simulation":

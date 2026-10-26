@@ -41,6 +41,7 @@ import android.text.SpannableString;
 import android.text.Spanned;
 import android.text.TextPaint;
 import android.text.TextUtils;
+import android.util.Log;
 import android.view.Gravity;
 import android.view.KeyEvent;
 import android.view.View;
@@ -78,6 +79,7 @@ import java.util.Set;
 public class MainActivity extends Activity implements AppAdapter.TileListener {
 
     private static final int LAUNCHER_SETTINGS_REQUEST = 42;
+    private RemoteKeyPolicy remoteKeys;
     /** Tiles per row and dock slots (res/values/config.xml, columns). Set in onCreate. */
     static int COLUMNS = 4;
     private boolean rtlAppGrid;
@@ -179,6 +181,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
             handler.post(MainActivity.this::updateWifiLabel);
         }
     };
+    private HaCards haCards;
     private final IntentFilter packageFilter = new IntentFilter();
     private final BroadcastReceiver packageReceiver = new BroadcastReceiver() {
         @Override
@@ -202,6 +205,8 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        remoteKeys = new RemoteKeyPolicy(getResources().getIntArray(R.array.settings_key_scancodes),
+                getResources().getIntArray(R.array.settings_key_keycodes));
         setContentView(R.layout.activity_main);
         density = getResources().getDisplayMetrics().density;
         // config.xml, overlaid by config.json from a pushed theme (see Config and tools/theme.sh).
@@ -211,7 +216,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         ambientGlow = cfg.ambientGlow;
         advancedEffects = cfg.animations && cfg.advancedEffects;
         reducedMotion = cfg.reducedMotion;
-        informationPanel = cfg.energyPanel || cfg.weatherPanel;
+        informationPanel = cfg.energyPanel || cfg.weatherPanel || cfg.vehiclePanel;
         style = cfg.style;
         liveTvPkg = cfg.liveTvPackage;
         liveTvAction = cfg.liveTvAction;
@@ -252,7 +257,8 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         hiddenApps = new HashSet<>(cfg.hiddenApps);
 
         grid = findViewById(R.id.grid);
-        adapter = new AppAdapter(this, this, COLUMNS, cfg);
+        haCards = new HaCards(this);
+        adapter = new AppAdapter(this, this, COLUMNS, cfg, haCards);
         adapter.setAllAppsPage(allAppsPage);
         updatePageUi();
         rtlAppGrid = getResources().getBoolean(R.bool.rtl_app_grid);
@@ -441,6 +447,11 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
     @Override
     protected void onResume() {
         super.onResume();
+        if (haCards != null && haCards.configurationChanged()) {
+            recreate();
+            return;
+        }
+        if (haCards != null) haCards.foreground(true);
         promptsPaused = false;
         if (rebuildOnResume) {
             tilesReady = false;
@@ -524,6 +535,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
 
     @Override
     protected void onPause() {
+        if (haCards != null) haCards.foreground(false);
         super.onPause();
         stopAmbientAnimation();
         heroName.animate().cancel();
@@ -549,6 +561,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
 
     @Override
     protected void onDestroy() {
+        if (haCards != null) haCards.close();
         super.onDestroy();
         ConnectivityManager cm = getSystemService(ConnectivityManager.class);
         TvInputManager tim = (TvInputManager) getSystemService(TV_INPUT_SERVICE);
@@ -562,6 +575,18 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
     @Override
     public void onBackPressed() {
         if (allAppsPage) showAppsPage(false);
+    }
+
+    @Override
+    public boolean dispatchKeyEvent(KeyEvent event) {
+        if (remoteKeys != null && RemoteKeyPolicy.isKeyAction(event.getAction())
+                && remoteKeys.isSettingsKey(event.getKeyCode(), event.getScanCode())) {
+            if (RemoteKeyPolicy.opensOnRelease(event.getAction(), event.isCanceled())) {
+                open(systemIntent(Settings.ACTION_SETTINGS));
+            }
+            return true;
+        }
+        return super.dispatchKeyEvent(event);
     }
 
     private void updateGridPadding() {
@@ -1035,7 +1060,8 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
         try {
             startActivity(i);
-        } catch (ActivityNotFoundException e) {
+        } catch (ActivityNotFoundException | SecurityException e) {
+            Log.e("TvHome", "Cannot open the requested system action", e);
             Toast.makeText(this, R.string.not_available, Toast.LENGTH_SHORT).show();
         }
     }

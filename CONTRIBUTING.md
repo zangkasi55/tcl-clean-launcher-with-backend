@@ -8,11 +8,12 @@ backend fixes and small remote-first UI improvements are all welcome.
 
 ## Access and scope
 
-The repository is currently private. Ask owner
-[zangkasi55](https://github.com/zangkasi55) for collaborator access through your
-existing contact channel. Cloning, downloads and PRs require access; the owner
-decides whether to invite contributors or make a future public release.
-Private forks are subject to GitHub/account policies and are not assumed.
+The repository is public: anyone can read/clone the source and download
+published releases. A GitHub account is needed to open issues or pull requests.
+Fork it for contributions, or ask owner [zangkasi55](https://github.com/zangkasi55)
+for collaborator access through your existing contact channel. Direct push
+access and release publication remain maintainer-controlled. Never include
+private runtime data just because the source repository is public.
 
 This edition is **preservation-first**. Do not make bulk debloating, factory
 resets, app-data clearing, broad permissions or unrequested Home changes part
@@ -29,7 +30,7 @@ Do not silently make an optional feature mandatory.
 - Fix keyboard/focus or touch handling with a regression test.
 - Add a sanitized reproduction for an image, timezone or feed-quality edge case.
 - Improve error messages, localization or accessibility.
-- Make backend/photo test execution in CI more complete.
+- Extend bounded direct-HA, mapping, mobile photo or lifecycle regression coverage.
 - Update generic examples without adding private hostnames or credentials.
 
 Use issues in **this repository** for this controller/edition. The inherited
@@ -40,13 +41,16 @@ support questions to upstream by default.
 ## Development workflow
 
 1. Read [architecture](docs/ARCHITECTURE.md) and the relevant component guide.
-2. Clone the repository and create a focused branch:
+2. Fork/clone the public repository and create a focused branch:
 
    ```powershell
-   gh repo clone zangkasi55/tcl-clean-launcher-with-backend
+   gh repo fork zangkasi55/tcl-clean-launcher-with-backend --clone
    Set-Location .\tcl-clean-launcher-with-backend
    git switch -c docs/clearer-installation
    ```
+
+   Maintainers with direct push access can use `gh repo clone` instead of
+   `gh repo fork --clone`; outside contributors push to their own fork.
 
 3. Set up the [isolated sandbox](docs/BUILD.md#sandbox-development).
 4. Reproduce the issue with fake/synthetic data, then make the smallest
@@ -65,8 +69,9 @@ support questions to upstream by default.
 
 The `git add docs` example is deliberately scoped. For code changes, stage
 only the intended source/test files; do not blindly add a working data folder.
-If you do not have push access, coordinate an allowed contribution route with
-the owner rather than publishing a private repository elsewhere.
+If you do not have push access, push your branch to your fork and open a PR
+against this repository. Keep household configurations and credentials out
+of the fork as well.
 
 ## Component expectations
 
@@ -74,9 +79,12 @@ the owner rather than publishing a private repository elsewhere.
 
 - Java/Android Views; keep the launcher small and responsive on constrained TVs.
 - Keep D-pad movement deterministic, including first/last rows and app return.
-- Do not add network access, telemetry or a new persistent background service
-  without an explicit design discussion.
+- Preserve the approved optional direct-HA WSS path and its TV-private credential
+  boundary. New endpoints, telemetry or persistent background services still
+  require an explicit design discussion.
 - Keep panel-file I/O off the UI thread and bound reads/resource usage.
+- Test visible-card ownership, reconnect/source revisions, auth failures,
+  strict mappings, stale observations and the absence of implicit backend fallback.
 - Preserve lifecycle cancellation, input/Settings access and stock recovery.
 - Put ordinary TV-specific options in configuration rather than scattered
   device-model checks.
@@ -93,7 +101,9 @@ justify removing those scoped behaviors without discussing the consequences.
 - Preserve app inventory/baseline checks and exact managed package-state recovery.
 - Keep ADB operations serialized and telemetry lower-priority than TV control.
 - Do not expose arbitrary shell commands or bypass origin/CSRF/session checks.
-- Keep passwords, HA tokens and ADB/signing identities outside source and the TV.
+- Keep passwords, HA tokens and ADB/signing identities outside source, examples
+  and logs. Backend HA tokens stay on the NAS; the dedicated direct token stays
+  encrypted in TV-private storage and is never transferred by the controller.
 - Preserve usage through restart/midnight; do not charge unknown observation gaps.
 - Test stale/unavailable/offline states, not only happy-path sensor values.
 
@@ -125,13 +135,16 @@ Exact setup and commands are in [BUILD.md](docs/BUILD.md).
 | API/session/access | Focused pytest API/passwordless/management tests and Ruff |
 | Accounting/persistence | Allowance, persistence and sandbox tests; midnight/restart edge cases |
 | Images/photo UI | Python image/API tests, Node crop tests and isolated WebKit photo suite |
-| Energy/weather | Relevant source/topology/feed-quality tests; explicit stale/unavailable checks |
+| Energy/Haval/weather | Source/topology/feed-quality and shared parity fixtures; explicit stale/unavailable/unknown charging checks |
+| Direct HA/mapping UI | Controller strict-mapping tests; native session/converter/lifecycle/credential tests; isolated WebKit mapping regressions; no backend/token/source mutation |
+| Release acceptance | Synthetic Pester signature/test-report/size regressions, including the exact 409,600-byte boundary |
 | Native navigation/layout | JVM tests, Android lint/release build, D-pad/device smoke test |
 | Native HOME/recovery | Backend device/Home tests, policy tests and an approved real-device recovery plan |
 
-The current GitHub CI runs native build/lint/JVM/size checks and upstream
-lists/tools/docs tests. It does **not** run every backend/photo suite. Include
-the missing local results rather than relying solely on a green CI badge.
+The GitHub CI runs native build/lint/JVM/size checks, upstream lists/tools/docs,
+controller pytest/Ruff, Node photo tests, sequential WebKit mapping/photo tests
+and Windows release acceptance. Include relevant local results, and identify
+physical-TV/iPhone tests separately rather than treating CI as hardware proof.
 Never run write-capable regression tests against production.
 
 ## Pull request checklist

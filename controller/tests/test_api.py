@@ -359,7 +359,7 @@ def test_image_pickers_include_local_save_apply_preview_and_feedback(client):
     assert any(tag == "canvas" and attrs.get("width") == "960"
                and attrs.get("height") == "540" and attrs.get("tabindex") == "0"
                for tag, attrs in wallpaper)
-    assert 'src="app.js?v=2.6.23" type="module"' in response.text
+    assert 'src="app.js?v=2.6.25" type="module"' in response.text
 
 
 def test_failed_theme_activation_can_undo_to_the_last_working_design(client, device, monkeypatch):

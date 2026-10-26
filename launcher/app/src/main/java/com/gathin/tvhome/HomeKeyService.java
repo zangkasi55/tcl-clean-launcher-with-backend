@@ -1,10 +1,13 @@
 package com.gathin.tvhome;
 
 import android.accessibilityservice.AccessibilityService;
+import android.content.ActivityNotFoundException;
 import android.content.Intent;
 import android.provider.Settings;
+import android.util.Log;
 import android.view.KeyEvent;
 import android.view.accessibility.AccessibilityEvent;
+import android.widget.Toast;
 
 /**
  * Sends the remote's Home button to this launcher on remotes that emit KEYCODE_ALL_APPS for Home
@@ -17,42 +20,42 @@ import android.view.accessibility.AccessibilityEvent;
  */
 public class HomeKeyService extends AccessibilityService {
 
-    /** Remote buttons that should open Settings (config.xml, settings_key_scancodes and settings_key_keycodes). */
-    private int[] settingsScancodes = new int[0];
-    private int[] settingsKeycodes = new int[0];
+    private RemoteKeyPolicy keys;
 
     @Override
     protected void onServiceConnected() {
         super.onServiceConnected();
-        settingsScancodes = getResources().getIntArray(R.array.settings_key_scancodes);
-        settingsKeycodes = getResources().getIntArray(R.array.settings_key_keycodes);
-    }
-
-    private boolean isSettingsKey(KeyEvent event) {
-        if (event.getKeyCode() == KeyEvent.KEYCODE_SETTINGS) return true;
-        for (int code : settingsScancodes) if (event.getScanCode() == code) return true;
-        for (int code : settingsKeycodes) if (event.getKeyCode() == code) return true;
-        return false;
+        keys = new RemoteKeyPolicy(getResources().getIntArray(R.array.settings_key_scancodes),
+                getResources().getIntArray(R.array.settings_key_keycodes));
     }
 
     @Override
     protected boolean onKeyEvent(KeyEvent event) {
-        // The stock launcher handled the remote's Settings button; with it disabled the button does nothing.
-        if (isSettingsKey(event)) {
-            if (event.getAction() == KeyEvent.ACTION_UP && !event.isCanceled()) {
-                startActivity(new Intent(Settings.ACTION_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+        if (keys == null || !RemoteKeyPolicy.isKeyAction(event.getAction())) return false;
+        if (keys.isSettingsKey(event.getKeyCode(), event.getScanCode())) {
+            if (RemoteKeyPolicy.opensOnRelease(event.getAction(), event.isCanceled())) {
+                open(new Intent(Settings.ACTION_SETTINGS));
             }
             return true;
         }
         if (event.getKeyCode() != KeyEvent.KEYCODE_ALL_APPS) return false;
-        if (event.getAction() == KeyEvent.ACTION_UP && !event.isCanceled()) {
+        if (RemoteKeyPolicy.opensOnRelease(event.getAction(), event.isCanceled())) {
             Intent home = new Intent(Intent.ACTION_MAIN)
                     .addCategory(Intent.CATEGORY_HOME)
                     .setPackage(getPackageName())
-                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED);
-            startActivity(home);
+                    .addFlags(Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED);
+            open(home);
         }
         return true;
+    }
+
+    private void open(Intent intent) {
+        try {
+            startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+        } catch (ActivityNotFoundException | SecurityException error) {
+            Log.e("TvHome.RemoteKeys", "Cannot open the requested remote action", error);
+            Toast.makeText(this, R.string.not_available, Toast.LENGTH_SHORT).show();
+        }
     }
 
     @Override

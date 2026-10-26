@@ -2,9 +2,10 @@
 
 [Illustrated manual](../USER_GUIDE.md) | [Installation](../INSTALLATION.md) | [Upload policy](../PRIVACY.md)
 
-These pictures illustrate controller **2.6.23**. They are real captures of its
-isolated browser sandbox, not captures of a household TV, NAS or Home Assistant
-account. Every picture is visibly labeled **SIMULATED**.
+The original seven pictures illustrate controller **2.6.23**; the added direct
+mapping screen illustrates the **2.6.26 source candidate**. They are real
+captures of isolated browser sandboxes, not a household TV, NAS or Home
+Assistant account. Every picture is visibly labeled **SIMULATED**.
 
 ## Screen index
 
@@ -17,6 +18,7 @@ account. Every picture is visibly labeled **SIMULATED**.
 | [Daily allowance](daily-allowance.png) | Ten simulated minutes used out of a forty-minute example rule | [Allowance guide](../USER_GUIDE.md#daily-allowance) |
 | [Device connection](device-connection.png) | Inspect/preserve and baseline download | [TV authorization](../INSTALLATION.md#6-authorize-the-controller-on-the-tv) |
 | [Home and recovery](home-recovery.png) | Staged install, opt-in Home selection and stock-Home restoration controls | [Home modes and limitations](../INSTALLATION.md#choose-a-home-mode) |
+| [Direct HA mappings](direct-ha-mappings.png) | Separate Save, Load, Download and Send; credentials/source unchanged | [Direct-HA setup](../DIRECT_HA.md#1-prepare-and-save-mappings) |
 
 ## Provenance
 
@@ -41,9 +43,14 @@ account. Every picture is visibly labeled **SIMULATED**.
   were checked separately: saving did not apply the design to the simulated TV.
 - Temporary labels were added to the capture DOM only. Recovery screenshots
   show controls, not an actual default-launcher switch or failback test.
-- All seven PNGs were visually inspected before publication. Views are cropped
+- All eight PNGs were visually inspected before publication. Views are cropped
   to the relevant controls for readability; no developer tools, session values,
   request headers, private hostnames or personal media are included.
+- The direct-mapping capture used a new isolated 2.6.26 validation sandbox and
+  WebKit 27.2, with generic mappings only. No token was entered, no external
+  request was made and no TV transfer/source switch was attempted. Backend
+  feeds, theme, app rule and device settings were checked unchanged.
+  It is a portal-control illustration, not direct-TV connectivity evidence.
 
 ## Updating these examples
 

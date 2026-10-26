@@ -44,6 +44,7 @@ final class Config {
     final Map<String, String> tileArtwork;
     final boolean energyPanel;
     final boolean weatherPanel;
+    final boolean vehiclePanel;
     final ThemeStyle style;
     final String liveTvPackage;
     final String liveTvAction;
@@ -77,13 +78,14 @@ final class Config {
                    boolean showHomeSettingsShortcut, int backgroundColor, int skyIntensity,
                    File wallpaper, boolean overlayApplied, List<String> appOrder,
                    Map<String, String> tileArtwork, boolean energyPanel,
-                   boolean weatherPanel, ThemeStyle style, boolean ambientGlow) {
+                   boolean weatherPanel, boolean vehiclePanel, ThemeStyle style, boolean ambientGlow) {
         this.dockApps = Collections.unmodifiableList(dockApps);
         this.hiddenApps = Collections.unmodifiableList(hiddenApps);
         this.appOrder = Collections.unmodifiableList(appOrder);
         this.tileArtwork = Collections.unmodifiableMap(tileArtwork);
         this.energyPanel = energyPanel;
         this.weatherPanel = weatherPanel;
+        this.vehiclePanel = vehiclePanel;
         this.style = style;
         this.liveTvPackage = liveTvPackage;
         this.liveTvAction = liveTvAction;
@@ -135,6 +137,7 @@ final class Config {
         boolean applied = false;
         boolean energyPanel = res.getBoolean(R.bool.energy_panel);
         boolean weatherPanel = res.getBoolean(R.bool.weather_panel);
+        boolean vehiclePanel = res.getBoolean(R.bool.vehicle_panel);
         List<String> appOrder = new ArrayList<>();
         Map<String, String> tileArtwork = new HashMap<>();
 
@@ -164,6 +167,7 @@ final class Config {
             skyIntensity = integer(json, "sky_intensity", skyIntensity, 0, 100);
             energyPanel = bool(json, "energy_panel", energyPanel);
             weatherPanel = bool(json, "weather_panel", weatherPanel);
+            vehiclePanel = bool(json, "vehicle_panel", vehiclePanel);
             for (String component : stringList(json, "app_order", Collections.emptyList())) {
                 try {
                     String canonical = AppCatalog.canonicalComponent(component);
@@ -212,7 +216,7 @@ final class Config {
                 Math.max(1, columns), Math.max(0, rowsBelow), animations, advancedEffects,
                 shamsi, moduleCards, reducedMotion, vpn, homeSettings, background,
                 Math.max(0, Math.min(100, skyIntensity)), wallpaper, applied, appOrder, tileArtwork,
-                energyPanel, weatherPanel, json == null ? ThemeStyle.defaults() : new ThemeStyle(
+                energyPanel, weatherPanel, vehiclePanel, json == null ? ThemeStyle.defaults() : new ThemeStyle(
                         color(json, "gradient_color", 0xFF060A13),
                         integer(json, "gradient_opacity", 0, 0, 100),
                         color(json, "clock_color", 0xFFFFFFFF),

@@ -1,5 +1,5 @@
 "use strict";
-import {cropRectangle, drawPhoto, openPhoto, preparePhotoUpload} from "./photo-tools.js?v=2.6.23";
+import {cropRectangle, drawPhoto, openPhoto, preparePhotoUpload} from "./photo-tools.js?v=2.6.25";
 
 const $ = (id) => document.getElementById(id);
 const YOUTUBE = "com.google.android.youtube.tv/com.google.android.apps.youtube.tv.activity.ShellActivity";
@@ -9,7 +9,7 @@ let screenUrl = null;
 let energyEvents = null;
 let previewKey = "", energyKey = "", factsKey = "", eventsKey = "";
 let previewAppsPage = false;
-let weatherKey = "";
+let weatherKey = "", vehicleKey = "", ruleAppsKey = "";
 let wallpaperCrop = null, cropDrag = null;
 const themeColors = [["background-color", "background_color"], ["gradient-color", "gradient_color"], ["clock-color", "clock_color"], ["date-color", "date_color"], ["input-color", "input_color"], ["wifi-color", "wifi_color"], ["settings-color", "settings_color"]];
 const energyBindings = [["solar", "solar_entity"], ["home", "home_entity"], ["grid", "grid_entity"], ["battery", "battery_entity"], ["soc", "battery_soc_entity"], ["grid-import", "grid_import_entity"], ["grid-export", "grid_export_entity"], ["battery-discharge", "battery_discharge_entity"], ["battery-charge", "battery_charge_entity"]];
@@ -89,6 +89,15 @@ function uniqueApps() {
 function option(value, text) {
   const node = document.createElement("option"); node.value = value; node.textContent = text; return node;
 }
+function renderRuleApps(selected = $("rule-app").value) {
+  const apps = uniqueApps();
+  const key = JSON.stringify(apps.map(app => [app.package, app.label]));
+  if (key !== ruleAppsKey) {
+    $("rule-app").replaceChildren(...apps.map(app => option(app.package, `${app.label} / ${app.package}`)));
+    ruleAppsKey = key;
+  }
+  $("rule-app").value = apps.some(app => app.package === selected) ? selected : status.monitor.rule.package;
+}
 function markDirty() {
   dirty = true; $("theme-dirty").textContent = "Preview changed / not applied to the TV";
   renderPreview();
@@ -126,7 +135,7 @@ function renderImageSelections() {
 function renderPreview() {
   renderImageSelections();
   const nextKey = JSON.stringify([theme, status.apps]);
-  if (nextKey === previewKey) { renderEnergy(); return; }
+  if (nextKey === previewKey) { renderEnergy(); renderWeather(); renderVehicle(); return; }
   previewKey = nextKey;
   const catalog = status.apps.filter(app => app.package !== "com.gathin.tvhome");
   $("preview-count").textContent = `${theme.dock_apps.length} favorites / ${catalog.length} apps preserved`;
@@ -175,6 +184,7 @@ function renderPreview() {
   $("favorite-add").replaceChildren(...uniqueApps().filter(a => !theme.dock_apps.includes(a.package)).map(a => option(a.package, a.label)));
   renderEnergy();
   renderWeather();
+  renderVehicle();
 }
 function showPreviewPage(allApps) {
   previewAppsPage = allApps;
@@ -189,14 +199,17 @@ function powerText(watts) {
   const value = Math.abs(watts);
   return value >= 1000 ? `${(value / 1000).toFixed(2)} kW` : `${Math.round(value)} W`;
 }
+function renderPanelVisibility() {
+  $("preview-middle").hidden = [theme.energy_panel, theme.vehicle_panel, theme.weather_panel].every(value => value === false);
+}
 function renderEnergy() {
+  renderPanelVisibility();
   const reading = status.energy;
   const nextKey = JSON.stringify([theme.energy_panel, reading?.source, reading?.status,
     reading?.metrics, reading?.topology, reading?.message, status.energy_delivery_error]);
   if (nextKey === energyKey) return;
   energyKey = nextKey;
   $("energy-panel").hidden = theme.energy_panel === false;
-  $("preview-middle").hidden = theme.energy_panel === false && theme.weather_panel === false;
   $("tv-preview").classList.toggle("has-energy", theme.energy_panel !== false);
   const metrics = reading?.metrics;
   const current = reading && ["live", "simulated"].includes(reading.status);
@@ -284,7 +297,7 @@ function renderEnergyTopology(topology, current) {
 function renderWeather() {
   const reading = status.weather;
   $("weather-panel").hidden = theme.weather_panel === false;
-  $("preview-middle").hidden = theme.energy_panel === false && theme.weather_panel === false;
+  renderPanelVisibility();
   let state = reading?.status || "unconfigured";
   if (state === "live" && (!Number.isFinite(reading.received_at_ms)
       || Date.now() - reading.received_at_ms < -5000
@@ -308,8 +321,37 @@ function renderWeather() {
   }));
   $("weather-details").textContent = [reading?.message, data?.name, status.weather_delivery_error].filter(Boolean).join(" ");
 }
+function renderVehicle() {
+  renderPanelVisibility();
+  $("vehicle-panel").hidden = theme.vehicle_panel === false;
+  const reading = status.vehicle, data = reading?.data;
+  let state = reading?.status || "unconfigured";
+  const valid = Number.isFinite(data?.battery_soc) && data.battery_soc >= 0
+    && data.battery_soc <= 100 && typeof data.charging === "boolean";
+  if (state === "live" && (!Number.isFinite(reading.received_at_ms)
+      || Date.now() - reading.received_at_ms < -5000
+      || Date.now() - reading.received_at_ms > (reading.stale_after_ms || 900000))) state = "stale";
+  if (!valid && ["live", "simulated"].includes(state)) state = "unavailable";
+  const key = JSON.stringify([theme.vehicle_panel, state, data, reading?.message, status.vehicle_delivery_error]);
+  if (key === vehicleKey) return;
+  vehicleKey = key;
+  const current = ["live", "simulated"].includes(state);
+  const activity = valid ? data.charging ? "Charging" : "Not charging" : "Unknown";
+  const label = state === "live" ? "Live" : state === "simulated" ? "Simulated" : state === "stale" ? "Stale" : "Unavailable";
+  $("vehicle-panel").classList.toggle("is-stale", !current);
+  $("vehicle-panel").classList.toggle("is-charging", current && valid && data.charging);
+  $("vehicle-soc").textContent = valid ? `${Math.round(data.battery_soc)}%` : "--%";
+  $("vehicle-battery-fill").style.width = valid ? `${data.battery_soc}%` : "0%";
+  $("vehicle-activity").textContent = !current && valid ? `Last: ${activity}` : activity;
+  $("vehicle-status").textContent = label;
+  $("vehicle-panel").setAttribute("aria-label", `Haval battery: ${$("vehicle-soc").textContent}, ${$("vehicle-activity").textContent}, ${label}.`);
+  const observed = Number.isFinite(reading?.received_at_ms) ? `Last HA observation: ${new Date(reading.received_at_ms).toLocaleString()}.` : "";
+  $("vehicle-details").textContent = [reading?.message, observed,
+    !current && valid ? "Activity is last known, not current." : "", status.vehicle_delivery_error].filter(Boolean).join(" ");
+}
 function renderStatus() {
   const monitor = status.monitor, rule = monitor.rule, sample = monitor.last_sample;
+  renderRuleApps();
   const online = monitor.health === "online";
   $("logout").hidden = !status.login_required;
   $("lan-access-warning").hidden = status.login_required;
@@ -334,6 +376,7 @@ function renderStatus() {
   renderSandbox();
   renderEnergy();
   renderWeather();
+  renderVehicle();
   if (status.sandbox && status.energy_transport === "browser_bridge"
       && typeof globalThis.__tclReadAuthorizedEnergy === "function"
       && !globalThis.tclDashboardHeartbeat) {
@@ -432,11 +475,11 @@ async function refresh() {
       $("ambient-glow").checked = theme.ambient_glow !== false;
       $("energy-panel-enabled").checked = theme.energy_panel !== false;
       $("weather-panel-enabled").checked = theme.weather_panel !== false;
+      $("vehicle-panel-enabled").checked = theme.vehicle_panel !== false;
       renderPreview();
     }
     if (!initialized) {
-      $("rule-app").replaceChildren(...uniqueApps().map(a => option(a.package, `${a.label} / ${a.package}`)));
-      $("rule-app").value = status.monitor.rule.package;
+      renderRuleApps(status.monitor.rule.package);
       $("rule-minutes").value = status.monitor.rule.minutes;
       $("rule-timezone").value = status.monitor.rule.timezone;
       $("rule-enabled").checked = status.monitor.rule.enabled;
@@ -455,14 +498,24 @@ async function refresh() {
       $("energy-ha-dashboard").value = config.topology_dashboard || "";
       $("energy-ha-view").value = config.topology_view;
       updateEnergySourceFields();
-      $("energy-setup-status").textContent = config.transport === "browser_bridge" ? "Live development feed uses the already-authorized Home Assistant browser page. Keep that page connected; credentials never leave it or reach the TV." : config.transport === "simulation" ? "Explicit simulation selected. These are test values, not live energy readings." : settings.token_configured ? "Backend WebSocket authorization is configured. The TV displays automatically without login." : "Configure the backend-only HA token file for a persistent live WebSocket feed. The TV never logs in.";
+      $("energy-setup-status").textContent = config.transport === "browser_bridge" ? "Backend development feed uses the authorized HA browser page. Keep that page connected." : config.transport === "simulation" ? "Explicit backend simulation selected. These are test values, not live energy readings." : settings.token_configured ? "Backend WebSocket authorization is configured. Direct TV mode uses its own private TV setup instead." : "Backend mode needs the backend HA token file. Direct mode instead uses the TV's Home Assistant cards settings.";
       const weatherSettings = await api("weather/config");
       $("weather-feed-enabled").checked = weatherSettings.config.enabled;
       $("weather-entity").value = weatherSettings.config.entity_id || "";
       $("weather-transport").replaceChildren(option("websocket", "Live Home Assistant daily forecast"));
       if (status.sandbox) $("weather-transport").append(option("simulation", "Explicit simulated weather"));
       $("weather-transport").value = weatherSettings.config.transport;
-      $("weather-setup-status").textContent = weatherSettings.token_configured ? "Backend authorization is configured. The forecast stays local to the controller and TV." : "Use the backend HA URL/token file for live forecasts. No credentials go on the TV.";
+      $("weather-setup-status").textContent = weatherSettings.token_configured ? "Backend authorization is configured. This preview is the backend forecast." : "Backend mode needs the backend HA URL/token file. Direct mode uses private TV setup.";
+      const vehicleSettings = await api("vehicle/config");
+      $("vehicle-feed-enabled").checked = vehicleSettings.config.enabled;
+      $("vehicle-soc-entity").value = vehicleSettings.config.battery_soc_entity || "";
+      $("vehicle-charging-entity").value = vehicleSettings.config.charging_entity || "";
+      $("vehicle-transport").replaceChildren(option("websocket", "Live Home Assistant vehicle status"));
+      if (status.sandbox) $("vehicle-transport").append(option("simulation", "Explicit simulated vehicle"));
+      $("vehicle-transport").value = vehicleSettings.config.transport;
+      $("vehicle-setup-status").textContent = vehicleSettings.token_configured ? "Backend authorization is configured. Direct TV mode is separate; no vehicle actions are available." : "Backend mode needs the backend HA URL/token file. Direct TV mode is separate; no vehicle actions are available.";
+      const direct = await api("ha/cards");
+      $("ha-cards-status").textContent = direct.saved ? "Direct mappings are saved. Load them to edit, or send the saved document to the TV. Current forms initially show backend settings." : "No direct mappings saved yet. Edit the entity forms, then Save direct mappings.";
       initialized = true;
     }
     renderStatus();
@@ -604,6 +657,7 @@ $("tv-preview").addEventListener("keydown", event => {
 for (const [id, key] of themeColors) $(id).oninput = () => { theme[key] = $(id).value.toUpperCase(); markDirty(); };
 $("gradient-opacity").oninput = () => { theme.gradient_opacity = Number($("gradient-opacity").value); markDirty(); };
 $("weather-panel-enabled").onchange = () => { theme.weather_panel = $("weather-panel-enabled").checked; markDirty(); };
+$("vehicle-panel-enabled").onchange = () => { theme.vehicle_panel = $("vehicle-panel-enabled").checked; markDirty(); };
 $("columns").onchange = () => { theme.columns = Number($("columns").value); markDirty(); };
 $("animations").onchange = () => { theme.animations = $("animations").checked; markDirty(); };
 $("ambient-glow").onchange = () => { theme.ambient_glow = $("ambient-glow").checked; markDirty(); };
@@ -688,7 +742,7 @@ $("target-form").onsubmit = event => {
 };
 $("inspect").onclick = () => action($("inspect"), async () => {
   message("Reading the TV's apps and original Home. This may take a moment.");
-  await api("inventory", {method: "POST"}); initialized = false; await refresh(); message("App inventory captured. Existing app states are preserved.");
+  await api("inventory", {method: "POST"}); await refresh(); message("App inventory captured. Existing app states are preserved.");
 });
 $("install").onclick = () => action($("install"), async () => {
   if (!confirm("Install and open the new launcher? The current Home choice and existing package states will be preserved.")) return;
@@ -754,11 +808,66 @@ const energyPresets = {
 };
 document.querySelectorAll("[data-energy-preset]").forEach(button => button.onclick = () =>
   action(button, () => sandboxAction("energy", energyPresets[button.dataset.energyPreset])));
-$("energy-config-form").onsubmit = event => {
-  event.preventDefault();
+function energyFields() {
   const body = {enabled: $("energy-feed-enabled").checked, transport: $("energy-transport").value, grid_import_positive: $("energy-grid-sign").checked, battery_discharge_positive: $("energy-battery-sign").checked, topology_dashboard: $("energy-ha-card").checked ? $("energy-ha-dashboard").value.trim() : null, topology_view: $("energy-ha-view").value.trim()};
   for (const [id, key] of energyBindings) body[key] = $(`energy-entity-${id}`).value.trim() || null;
-  action(event.submitter, async () => { await api("energy/config", {method: "PUT", body: JSON.stringify(body)}); initialized = false; await refresh(); message("Energy source saved. Live feeds never substitute simulated data."); });
+  return body;
+}
+function weatherFields() {
+  return {enabled: $("weather-feed-enabled").checked, entity_id: $("weather-entity").value.trim() || null, transport: $("weather-transport").value};
+}
+function vehicleFields() {
+  return {enabled: $("vehicle-feed-enabled").checked,
+    battery_soc_entity: $("vehicle-soc-entity").value.trim() || null,
+    charging_entity: $("vehicle-charging-entity").value.trim() || null,
+    transport: $("vehicle-transport").value};
+}
+function showDirectFields(config) {
+  $("energy-feed-enabled").checked = config.energy.enabled;
+  $("energy-transport").value = config.energy.transport;
+  for (const [id, key] of energyBindings) $(`energy-entity-${id}`).value = config.energy[key] || "";
+  $("energy-grid-sign").checked = config.energy.grid_import_positive;
+  $("energy-battery-sign").checked = config.energy.battery_discharge_positive;
+  $("energy-ha-card").checked = !!config.energy.topology_dashboard;
+  $("energy-ha-dashboard").value = config.energy.topology_dashboard || "";
+  $("energy-ha-view").value = config.energy.topology_view;
+  updateEnergySourceFields();
+  $("weather-feed-enabled").checked = config.weather.enabled;
+  $("weather-entity").value = config.weather.entity_id || "";
+  $("weather-transport").value = config.weather.transport;
+  $("vehicle-feed-enabled").checked = config.vehicle.enabled;
+  $("vehicle-soc-entity").value = config.vehicle.battery_soc_entity || "";
+  $("vehicle-charging-entity").value = config.vehicle.charging_entity || "";
+  $("vehicle-transport").value = config.vehicle.transport;
+}
+$("ha-cards-save").onclick = () => action($("ha-cards-save"), async () => {
+  await api("ha/cards", {method: "PUT", body: JSON.stringify({
+    schema_version: 1, energy: energyFields(), weather: weatherFields(), vehicle: vehicleFields()})});
+  message("Direct mappings saved to the system. Use Send saved mappings to TV next. TV credentials and source were not changed.", false, $("ha-cards-status"));
+}, $("ha-cards-status"));
+$("ha-cards-load").onclick = () => action($("ha-cards-load"), async () => {
+  const saved = await api("ha/cards");
+  if (!saved.saved) throw new Error("No direct mappings are saved yet.");
+  showDirectFields(saved.config);
+  message("Saved direct mappings loaded into the three forms. Use Save direct mappings after editing; backend sources were not changed.", false, $("ha-cards-status"));
+}, $("ha-cards-status"));
+$("ha-cards-export").onclick = () => action($("ha-cards-export"), async () => {
+  const config = await api("ha/cards/export");
+  const url = URL.createObjectURL(new Blob([JSON.stringify(config, null, 2)], {type: "application/json"}));
+  const link = document.createElement("a");
+  link.href = url; link.download = "ha-cards.json";
+  document.body.append(link); link.click(); link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  message("Saved direct mappings downloaded. The file contains entity mappings only, not credentials.", false, $("ha-cards-status"));
+}, $("ha-cards-status"));
+$("ha-cards-send").onclick = () => action($("ha-cards-send"), async () => {
+  await api("ha/cards/send", {method: "POST"});
+  message("Saved mappings sent to the TV. Select Direct Home Assistant in the TV's private setup to use them. Website previews still show backend data.", false, $("ha-cards-status"));
+}, $("ha-cards-status"));
+$("energy-config-form").onsubmit = event => {
+  event.preventDefault();
+  const body = energyFields();
+  action(event.submitter, async () => { await api("energy/config", {method: "PUT", body: JSON.stringify(body)}); await refresh(); message("Energy source saved. Live feeds never substitute simulated data."); });
 };
 function updateEnergySourceFields() {
   const automatic = $("energy-ha-card").checked;
@@ -773,9 +882,17 @@ $("energy-refresh").onclick = () => action($("energy-refresh"), async () => {
 $("weather-config-form").onsubmit = event => {
   event.preventDefault();
   action(event.submitter, async () => {
-    await api("weather/config", {method: "PUT", body: JSON.stringify({enabled: $("weather-feed-enabled").checked, entity_id: $("weather-entity").value.trim() || null, transport: $("weather-transport").value})});
-    initialized = false; await refresh(); message("Weather source saved. Live weather never substitutes simulated data.", false, $("weather-setup-status"));
+    await api("weather/config", {method: "PUT", body: JSON.stringify(weatherFields())});
+    await refresh(); message("Weather source saved. Live weather never substitutes simulated data.", false, $("weather-setup-status"));
   }, $("weather-setup-status"));
+};
+$("vehicle-config-form").onsubmit = event => {
+  event.preventDefault();
+  action(event.submitter, async () => {
+    await api("vehicle/config", {method: "PUT", body: JSON.stringify(vehicleFields())});
+    await refresh();
+    message("Vehicle source saved. No vehicle controls or energy calculations were changed.", false, $("vehicle-setup-status"));
+  }, $("vehicle-setup-status"));
 };
 setInterval(() => { if (csrf && !document.hidden) refresh().catch(error => message(error.message, true)); }, 5000);
 setInterval(() => {
@@ -786,6 +903,7 @@ setInterval(() => {
     renderEnergy();
   }
   if (theme && status?.weather) renderWeather();
+  if (theme && status?.vehicle) renderVehicle();
 }, 1000);
 $("retry-connection").onclick = () => location.reload();
 (async () => {

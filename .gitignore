@@ -36,6 +36,9 @@ initial-admin-password.txt
 private-adb/
 native-home-backup.json
 home-override-backup.json
+native-remote-keys.json
+ha-cards.json
+ha_connection_v1.xml
 # Keep private photos and screenshots out; exceptions are reviewed project assets.
 *.jpg
 *.jpeg

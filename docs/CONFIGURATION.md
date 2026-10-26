@@ -63,7 +63,19 @@ field in the supplied Compose file.
 
 ## Home Assistant energy and weather
 
-### Store authorization only on the NAS
+This heading also covers the Haval battery/charging feed. Current source
+supports two independent credential locations:
+
+- **Direct TV mode:** provision a dedicated TV token in the native connection
+  screen; transfer only credential-free mappings from the portal. Follow
+  [direct-HA setup and rollback](DIRECT_HA.md).
+- **Backend mode and portal previews:** provision the NAS token file below.
+  The portal preview is not proof of a direct TV connection.
+
+Saving backend feeds and saving direct mappings are separate operations.
+Neither silently selects the other TV source.
+
+### Backend mode: store authorization only on the NAS
 
 Create a dedicated HA account/token with appropriate access, and write the
 token directly into a restricted file through your secure administration
@@ -88,7 +100,7 @@ hardening. If DSM uses an override file, ensure Container Manager actually
 loads it; otherwise merge the fragment into the existing service definition.
 Do not assume a file present in the project folder is automatically active.
 
-HA authorization stays in the backend. Connections verify TLS and do not
+This backend authorization stays on the NAS. Connections verify TLS and do not
 forward the token across redirects. The integration reads data/subscriptions;
 it does not control an inverter or make HA service calls to change power flow.
 
@@ -124,6 +136,19 @@ In **Home design**, enable the weather feed and set an exact HA
 temperature, units and daily forecasts must be available from that entity.
 Missing units/forecasts and unsupported subscriptions are reported, not
 fabricated. The same backend URL/token-file connection is used.
+
+### Haval battery and charging
+
+In **Home design**, enable the vehicle feed and select a battery `sensor.*`
+with `%` units and an exact `binary_sensor.*` for charging. SOC must be
+0-100%; charging is HA `on`/`off`, with unknown/unavailable reported rather
+than guessed off. The read-only native card occupies **10% of full-screen
+width** between the 30%-width Energy and Weather cards.
+
+Backend mode uses the NAS connection; direct mode uses the separate TV
+connection and [saved direct mappings](DIRECT_HA.md#1-prepare-and-save-mappings).
+No vehicle commands are exposed. Contact with HA is not evidence that a
+manufacturer/cloud integration has refreshed its underlying measurement.
 
 ## Home Assistant dashboard and iPhone
 

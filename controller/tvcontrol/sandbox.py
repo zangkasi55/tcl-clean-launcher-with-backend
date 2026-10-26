@@ -181,6 +181,11 @@ class SandboxDevice:
             self._require_online()
             self.store.put("sandbox_weather_panel", snapshot)
 
+    def publish_vehicle(self, snapshot: dict) -> None:
+        with self.lock:
+            self._require_online()
+            self.store.put("sandbox_vehicle_panel", snapshot)
+
     def screenshot(self) -> bytes:
         with self.lock:
             self._require_online()
@@ -273,7 +278,47 @@ class SandboxDevice:
                                   font=ImageFont.load_default(size=14), fill="#E8EDF4")
                     draw.text((72, 648), f"Battery charge: {metrics['battery_soc']:g}%",
                               font=ImageFont.load_default(size=14), fill="#FF4F92")
+                vehicle_left = 54 + (400 if theme.get("energy_panel", True) else 0)
+                if theme.get("vehicle_panel", True):
+                    config = self.store.get("vehicle_config") or {}
+                    vehicle = self.store.get("sandbox_vehicle_panel")
+                    if config.get("transport") == "simulation":
+                        vehicle = {"status": "simulated", "data": self.store.get("sandbox_vehicle_data")}
+                    elif vehicle is not None and vehicle.get("source") == "sandbox":
+                        vehicle = None
+                    if not config.get("enabled"):
+                        vehicle = None
+                    data = vehicle.get("data") if vehicle else None
+                    if vehicle is not None and vehicle.get("status") == "live":
+                        received = vehicle.get("received_at_ms")
+                        now_ms = datetime.now(timezone.utc).timestamp() * 1000
+                        if (not isinstance(received, (int, float))
+                                or not -5000 <= now_ms - received <= 900000):
+                            vehicle = {**vehicle, "status": "stale"}
+                    current = vehicle is not None and vehicle.get("status") in {"live", "simulated"}
+                    activity = ("Charging" if data["charging"] else "Not charging") if data else "Unknown"
+                    if data is not None and not current:
+                        activity = "Last: " + activity
+                    draw.rounded_rectangle((vehicle_left, 520, vehicle_left + 127, 676),
+                                           radius=14, fill="#20303c")
+                    draw.text((vehicle_left + 64, 544), "Haval", anchor="mm",
+                              font=text, fill="#E8F3FF")
+                    draw.rounded_rectangle((vehicle_left + 28, 562, vehicle_left + 96, 584),
+                                           radius=3, outline="#A4E7C4", width=2)
+                    if data is not None and data["battery_soc"] > 0:
+                        draw.rectangle((vehicle_left + 31, 565,
+                                        vehicle_left + 30 + max(1, round(62 * data["battery_soc"] / 100)), 581),
+                                       fill="#A4E7C4")
+                    draw.text((vehicle_left + 64, 612),
+                              f"{data['battery_soc']:.0f}%" if data else "--%", anchor="mm",
+                              font=ImageFont.load_default(size=30), fill="#E8F3FF")
+                    draw.text((vehicle_left + 64, 642), activity, anchor="mm",
+                              font=ImageFont.load_default(size=12), fill="#BBC8D3")
+                    draw.text((vehicle_left + 64, 662),
+                              vehicle.get("status", "unavailable") if vehicle else "Unavailable",
+                              anchor="mm", font=ImageFont.load_default(size=11), fill="#BBC8D3")
                 if theme.get("weather_panel", True):
+                    weather_left = vehicle_left + (144 if theme.get("vehicle_panel", True) else 0)
                     config = self.store.get("weather_config") or {}
                     weather = self.store.get("sandbox_weather_panel")
                     if config.get("transport") == "simulation":
@@ -284,18 +329,18 @@ class SandboxDevice:
                     if not config.get("enabled"):
                         weather = None
                     data = weather.get("data") if weather else None
-                    draw.rounded_rectangle((454, 520, 838, 676), radius=14, fill="#20303c")
-                    draw.text((472, 532), "Weather", font=text, fill="#E8F3FF")
-                    draw.text((472, 560), weather.get("status", "unconfigured") if weather
+                    draw.rounded_rectangle((weather_left, 520, weather_left + 384, 676), radius=14, fill="#20303c")
+                    draw.text((weather_left + 18, 532), "Weather", font=text, fill="#E8F3FF")
+                    draw.text((weather_left + 18, 560), weather.get("status", "unconfigured") if weather
                               else "No forecast", font=ImageFont.load_default(size=14),
                               fill="#BBC8D3")
                     if data is not None:
-                        draw.text((472, 582),
+                        draw.text((weather_left + 18, 582),
                                   f"{data['temperature']:.1f}{data['temperature_unit']}",
                                   font=ImageFont.load_default(size=24), fill="#E8F3FF")
                         for index, day in enumerate(data["forecast"]):
                             at = datetime.fromisoformat(day["datetime"].replace("Z", "+00:00"))
-                            left = 472 + index * 118
+                            left = weather_left + 18 + index * 118
                             draw.text((left, 618), at.strftime("%a"),
                                       font=ImageFont.load_default(size=14), fill="#BBC8D3")
                             low = "--" if day.get("templow") is None else f"{day['templow']:.1f}"

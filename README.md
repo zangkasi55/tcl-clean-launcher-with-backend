@@ -4,11 +4,18 @@ A native Android TV launcher paired with a Python/FastAPI web controller for
 Synology Container Manager. This TCL edition prioritizes preserving installed
 apps, sign-ins and TV settings rather than bulk debloating.
 
-| Component | Current release | Source |
+| Component | Current source | Source |
 |---|---|---|
-| Native Clean Home launcher | 2.6.18-tcl | [launcher/](launcher/) |
-| Web controller and photo tools | 2.6.23 | [controller/](controller/) |
-| Synology deployment | 2.6.23 | [Dockerfile](Dockerfile), [Compose](docker-compose.yaml) |
+| Native Clean Home launcher | 2.6.26-tcl, version code 20 | [launcher/](launcher/) |
+| Web controller and photo tools | 2.6.26 | [controller/](controller/) |
+| Synology deployment inputs | 2.6.26 | [Dockerfile](Dockerfile), [Compose](docker-compose.yaml) |
+
+**Source candidate, not a new packaged release:** direct-HA, Haval and remote-key
+changes have automated/off-TV validation, but their final installation,
+private TV provisioning and physical-button acceptance are still pending.
+The existing downloadable **v2.6.23** bundle contains the older **2.6.18-tcl**
+APK and does not provide direct-HA cards. Do not mix that APK into this source
+build. See [release status and setup](docs/DIRECT_HA.md#status-and-prerequisites).
 
 ## Documentation
 
@@ -22,6 +29,7 @@ this TCL edition; the historical upstream guide later on this page is optional.
 | Understand the components and data flow | [Architecture and diagrams](docs/ARCHITECTURE.md) |
 | See languages, frameworks, versions and limits | [Technology stack](docs/TECH_STACK.md) |
 | Configure HTTPS, access, Home Assistant and iPhone embedding | [Configuration reference](docs/CONFIGURATION.md) |
+| Connect Energy, Haval and Weather straight from the TV to HA | [Direct-HA setup and rollback](docs/DIRECT_HA.md) |
 | Build the APK/backend and run tests | [Build and development](docs/BUILD.md) |
 | Update, back up, recover or troubleshoot | [Operations and recovery](docs/OPERATIONS.md) |
 | Report a bug, improve docs or submit code | [Contributing](CONTRIBUTING.md) |
@@ -31,13 +39,16 @@ this TCL edition; the historical upstream guide later on this page is optional.
 flowchart LR
     Phone["Phone or browser"] -->|HTTPS| Proxy["HTTPS reverse proxy"]
     Proxy --> Backend["Python / FastAPI controller"]
-    HA["Home Assistant - optional"] -->|WebSocket readings| Backend
-    Backend -->|Authorized ADB on private network| TV["Android TV / Clean Home"]
+    Backend -->|Management and credential-free mappings over private ADB| TV["Android TV / Clean Home"]
+    TV <-->|Optional direct authenticated WSS| HA["Home Assistant"]
+    HA -->|Optional backend readings for previews and explicit rollback| Backend
     Backend --> Data[("Private persistent data")]
 ```
 
-The TV launcher does not browse Home Assistant or receive its token. The
-controller delivers local files to the TV. Existing installed apps and logins
+In direct mode, the TV authenticates to HA using a dedicated token entered
+and encrypted on the TV; the controller transfers only non-secret mappings.
+Backend readings remain available for portal previews and explicit rollback,
+never as an automatic direct-mode fallback. Existing installed apps and logins
 remain in place; the separately confirmed true-default mode changes only the
 two competing Google HOME package states and keeps those packages installed.
 
@@ -65,7 +76,8 @@ and deterministic timer testing.
   reachable TV debugging; read the recovery requirements before enabling it.
 - Lower favorites dock, a separate All Apps page, customizable artwork,
   wallpaper, colors and optional focused-app glow.
-- Energy Distribution and daily weather supplied by Home Assistant.
+- Energy Distribution, Haval battery/charging and daily weather supplied by
+  Home Assistant, with optional direct-TV WSS connections.
 - Persistent daily app allowance and discrete standby controls.
 - iPhone-friendly photo selection, touch/zoom 16:9 cropping and automatic local
   HEIC/HEIF conversion. Save to system and Apply to TV are separate actions.
@@ -81,12 +93,15 @@ energy values are simulated and no weather forecast is connected.*
 The [illustrated manual](docs/USER_GUIDE.md) shows the All apps page, mobile
 crop controls, saved-image confirmation and daily allowance. The
 [installation guide](docs/INSTALLATION.md) includes connection and recovery
-controls. All seven pictures follow the [sample-screen privacy policy](docs/screenshots/README.md).
+controls. The [direct-HA guide](docs/DIRECT_HA.md) adds its separate mapping
+controls. All eight pictures follow the [sample-screen privacy policy](docs/screenshots/README.md);
+the original seven show 2.6.23 and the new mapping example shows the 2.6.26 candidate.
 
 ## Download and deploy
 
-Download the signed **tvhome-release.apk**, **tcl-home-control-synology.zip** and
-**SHA256SUMS.txt** from [Releases](https://github.com/zangkasi55/tcl-clean-launcher-with-backend/releases/latest).
+For the older packaged **v2.6.23** installation, download the signed
+**tvhome-release.apk**, **tcl-home-control-synology.zip** and **SHA256SUMS.txt**
+from [that release](https://github.com/zangkasi55/tcl-clean-launcher-with-backend/releases/tag/v2.6.23).
 The Synology ZIP includes the controller build context and the signed launcher APK.
 Extract it and follow the [controller setup guide](controller/README.md), including
 the HTTPS/LAN restrictions, TV pairing and recovery prerequisites.
@@ -98,14 +113,13 @@ allowed origins and optional Home Assistant connection.
 ## Build from source
 
 The generated `dist/` directory is not tracked in Git. Docker needs the launcher
-APK there; build it using the [Windows build helper](scripts/build-launcher.ps1)
-or download the matching signed release before building the image:
+APK there; build the matching current native source using the
+[Windows build helper](scripts/build-launcher.ps1) before building the image:
 
 ```powershell
 gh repo clone zangkasi55/tcl-clean-launcher-with-backend
 Set-Location .\tcl-clean-launcher-with-backend
-New-Item -ItemType Directory -Path .\dist -Force | Out-Null
-gh release download v2.6.23 --repo zangkasi55/tcl-clean-launcher-with-backend --pattern tvhome-release.apk --dir .\dist
+.\scripts\build-launcher.ps1
 docker compose build
 ```
 
@@ -114,6 +128,8 @@ Native builds require JDK 17 and Android SDK 34. See the
 tests, photo-converter vendoring and signing-key backup requirements. Rebuilding
 without the original private signing identity cannot update an existing signed
 installation in place; the private key is intentionally not published here.
+Use the [contributor build](docs/BUILD.md#native-launcher-contributor-build)
+for tests that must not create or load a private release-signing identity.
 
 ## Attribution and licenses
 

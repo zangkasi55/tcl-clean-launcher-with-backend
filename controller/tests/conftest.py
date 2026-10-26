@@ -76,6 +76,13 @@ class FakeDevice:
     def publish_weather(self, snapshot):
         self.weather = snapshot
 
+    def publish_vehicle(self, snapshot):
+        self.vehicle = snapshot
+
+    def publish_ha_cards(self, mappings):
+        self.ha_cards = mappings
+        return True
+
     def install(self, apk):
         before = self.inventory()
         self.installed.add(LAUNCHER)

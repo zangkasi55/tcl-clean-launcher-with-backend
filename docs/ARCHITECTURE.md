@@ -19,7 +19,7 @@ flowchart TB
         subgraph Container["Controller container - UID 10001"]
             API["FastAPI + static web UI"]
             Monitor["Usage / power / HOME monitor"]
-            Feeds["Energy + weather services"]
+            Feeds["Backend Energy + Haval + Weather services"]
             ADB["Serialized authorized ADB transport"]
         end
         Data[("Persistent volume /data")]
@@ -29,6 +29,8 @@ flowchart TB
         Packages["Existing apps + stock HOME packages"]
         Files["Local theme / images / panel JSON"]
         Launcher["Native Clean Home launcher"]
+        Direct["Visible-card WSS sessions"]
+        Secrets["TV-private Keystore-encrypted credentials"]
     end
 
     User -->|HTTPS| Proxy
@@ -43,13 +45,18 @@ flowchart TB
     ADB <-->|Private TCP port 5555| Packages
     ADB -->|Checksummed local files| Files
     Files --> Launcher
+    Launcher --> Direct
+    Secrets --> Direct
+    Direct <-->|Direct authenticated WSS| HA
     Launcher -->|Android intents| Packages
 ```
 
 There is no Docker socket mount and no privileged container. The container
 uses a read-only root filesystem, a limited temporary filesystem and one
-private writable data volume. The launcher has no `INTERNET` permission; it
-reads files delivered through the controller's authorized ADB connection.
+private writable data volume. The launcher now has `INTERNET` permission for
+the optional direct-HA transport. Management still uses authorized private
+ADB. Direct mode never reads backend panel snapshots; backend mode retains
+the local-file path. See [source selection and setup](DIRECT_HA.md).
 
 ## Source map
 
@@ -59,13 +66,14 @@ Paths are relative to the repository root.
 |---|---|
 | Android lifecycle and navigation | [MainActivity.java](../launcher/app/src/main/java/com/gathin/tvhome/MainActivity.java), [AppAdapter.java](../launcher/app/src/main/java/com/gathin/tvhome/AppAdapter.java), [GridNavigation.java](../launcher/app/src/main/java/com/gathin/tvhome/GridNavigation.java) |
 | App discovery and layout | [AppCatalog.java](../launcher/app/src/main/java/com/gathin/tvhome/AppCatalog.java), [Config.java](../launcher/app/src/main/java/com/gathin/tvhome/Config.java), [ThemeStyle.java](../launcher/app/src/main/java/com/gathin/tvhome/ThemeStyle.java) |
-| Native information cards | [LocalSnapshotView.java](../launcher/app/src/main/java/com/gathin/tvhome/LocalSnapshotView.java), [EnergyFlowView.java](../launcher/app/src/main/java/com/gathin/tvhome/EnergyFlowView.java), [WeatherView.java](../launcher/app/src/main/java/com/gathin/tvhome/WeatherView.java) |
+| Native information cards | [LocalSnapshotView.java](../launcher/app/src/main/java/com/gathin/tvhome/LocalSnapshotView.java), [EnergyFlowView.java](../launcher/app/src/main/java/com/gathin/tvhome/EnergyFlowView.java), [VehicleView.java](../launcher/app/src/main/java/com/gathin/tvhome/VehicleView.java), [WeatherView.java](../launcher/app/src/main/java/com/gathin/tvhome/WeatherView.java) |
+| Direct HA sessions and secrets | [HaCards.java](../launcher/app/src/main/java/com/gathin/tvhome/HaCards.java), [HaSession.java](../launcher/app/src/main/java/com/gathin/tvhome/HaSession.java), [HaCredentials.java](../launcher/app/src/main/java/com/gathin/tvhome/HaCredentials.java), [HaSettingsActivity.java](../launcher/app/src/main/java/com/gathin/tvhome/HaSettingsActivity.java) |
 | Compatibility Home | [HomeOverrideService.java](../launcher/app/src/main/java/com/gathin/tvhome/HomeOverrideService.java), [HomeOverridePolicy.java](../launcher/app/src/main/java/com/gathin/tvhome/HomeOverridePolicy.java) |
 | HTTP startup and routes | [__main__.py](../controller/tvcontrol/__main__.py), [api.py](../controller/tvcontrol/api.py) |
 | Models, sessions and persistence | [models.py](../controller/tvcontrol/models.py), [auth.py](../controller/tvcontrol/auth.py), [store.py](../controller/tvcontrol/store.py) |
 | TV transport and preservation | [device.py](../controller/tvcontrol/device.py), [home.py](../controller/tvcontrol/home.py) |
 | Accounting and enforcement | [monitor.py](../controller/tvcontrol/monitor.py) |
-| Live data | [energy.py](../controller/tvcontrol/energy.py), [energy_topology.py](../controller/tvcontrol/energy_topology.py), [weather.py](../controller/tvcontrol/weather.py) |
+| Live data and direct mappings | [energy.py](../controller/tvcontrol/energy.py), [energy_topology.py](../controller/tvcontrol/energy_topology.py), [weather.py](../controller/tvcontrol/weather.py), [vehicle.py](../controller/tvcontrol/vehicle.py), [ha_cards.py](../controller/tvcontrol/ha_cards.py) |
 | Browser UI and photos | [app.js](../controller/tvcontrol/static/app.js), [photo-tools.js](../controller/tvcontrol/static/photo-tools.js), [images.py](../controller/tvcontrol/images.py) |
 | Offline development | [sandbox.py](../controller/tvcontrol/sandbox.py), [controller tests](../controller/tests/) |
 | Packaging | [Dockerfile](../Dockerfile), [build-launcher.ps1](../scripts/build-launcher.ps1), [package-synology.py](../scripts/package-synology.py) |
@@ -85,7 +93,10 @@ unauthenticated automation API. Automatic OpenAPI/Swagger routes are disabled.
 | NAS `/data/private-adb/` | This controller's ADB key pair | Secret identity; preserve both key files |
 | NAS `/data/native-home-backup.json` | Original HOME component, exact managed package states and recovery phase | Required for guarded native-mode restoration |
 | NAS `/data/home-override-backup.json` when present | Compatibility-service recovery information | Preserve with the rest of the private data |
-| TV app external-files directory | Active config, images, `energy.json` and `weather.json` | Delivered atomically; not the source of NAS usage history |
+| NAS `/data/native-remote-keys.json` when present | Ownership-aware remote-key accessibility recovery state | Preserve; do not overwrite unrelated services |
+| NAS SQLite direct-mapping record | Non-secret schema-1 mappings, separate from backend feed configuration | Private configuration; contains no TV token |
+| TV app external-files directory | Active config, images, backend panel snapshots and `ha-cards.json` | Delivered atomically; not the source of NAS usage history |
+| TV private preferences `ha_connection_v1` | Selected source and encrypted origin/token | Key is Android Keystore alias `tvhome.ha.v1`; not exported or sent to the NAS |
 | Developer sandbox directory | Fake device, manual clock and sandbox data | Kept separate by a runtime-mode marker |
 
 The TV files live under
@@ -141,7 +152,31 @@ and 60 million decoded pixels; the API separately limits image uploads to
 8 MiB and 20 million decoded pixels. See [photo limits](TECH_STACK.md#resource-and-input-limits).
 Conversion has no external service, and the original photo is not modified.
 
-## Live energy and weather
+## Live Energy, Haval and Weather
+
+The information row uses **30% / 10% / 30% of full-screen width** for Energy,
+Haval and Weather respectively. The vehicle card is read-only: percentage and
+Charging/Not charging, with explicit unknown/stale errors rather than a guessed
+off state. Fresh HA contact does not prove fresh manufacturer telemetry.
+
+### Direct mode
+
+The portal saves and sends a strict, credential-free mapping document, then
+the owner enters a trusted HTTPS origin and dedicated token on the TV.
+Saving mappings does not select the TV source or open Home.
+Each visible enabled card type owns one WSS connection; shared coordination
+uses one serial worker, not an unbounded thread/socket per view.
+Attached, shown, window-visible and foreground ownership are all required.
+The last hidden owner disconnects; returning Home reconnects.
+
+Mapping/source changes close old sessions first and reject late callbacks.
+TLS uses platform certificate and hostname verification, with the fixed
+`/api/websocket` path. Bounded frames/deadlines, explicit authentication and
+subscription failures and capped reconnect backoff prevent silent fallback.
+Keepalives alone do not refresh observations. Direct mode never instantiates
+the legacy snapshot loader. [Detailed contracts and rollback](DIRECT_HA.md).
+
+### Backend mode and portal previews
 
 The NAS authenticates to HA using a private token file. It subscribes over
 WebSocket to selected energy entities and to the selected weather entity's

@@ -80,6 +80,7 @@ class Theme(Model):
     sky_intensity: StrictInt = Field(default=0, ge=0, le=100)
     energy_panel: StrictBool = True
     weather_panel: StrictBool = True
+    vehicle_panel: StrictBool = True
     wallpaper_file: str | None = None
     tile_artwork: dict[str, str] = Field(default_factory=dict)
 

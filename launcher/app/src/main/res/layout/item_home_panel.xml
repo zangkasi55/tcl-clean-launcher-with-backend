@@ -21,6 +21,13 @@
             android:layout_height="128dp"
             android:focusable="false" />
 
+        <com.gathin.tvhome.VehicleView
+            android:id="@+id/vehicleBattery"
+            android:layout_width="wrap_content"
+            android:layout_height="128dp"
+            android:layout_marginStart="16dp"
+            android:focusable="false" />
+
         <com.gathin.tvhome.WeatherView
             android:id="@+id/weatherForecast"
             android:layout_width="wrap_content"

@@ -48,4 +48,72 @@ jobs:
         run: |
           size=$(stat -c %s launcher/app/build/outputs/apk/release/app-release.apk)
           echo "release APK: $((size / 1024)) KB"
-          test "$size" -lt 409600 || { echo "APK is over 400 KB; the launcher targets 1 GB TVs, keep it small"; exit 1; }
+          test "$size" -gt 0 && test "$size" -le 409600 || { echo "APK must be 1-409600 bytes; the launcher targets 1 GB TVs, keep it small"; exit 1; }
+
+  controller:
+    name: Controller, photo tools and WebKit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: controller/package-lock.json
+      - name: Development dependencies
+        run: |
+          python -m pip install -e './controller[test]'
+          npm --prefix controller ci --ignore-scripts
+      - name: Controller and photo unit tests
+        run: |
+          python -m pytest controller/tests -q
+          python -m ruff check controller
+          node --check controller/tvcontrol/static/app.js
+          npm --prefix controller run test:photos
+      - name: WebKit runtime
+        working-directory: controller
+        run: npx playwright-core install --with-deps webkit
+      - name: Isolated mobile mapping and photo regressions
+        env:
+          TVCONTROL_SANDBOX_DATA_DIR: ${{ runner.temp }}/tcl-webkit-sandbox
+          TVCONTROL_SANDBOX_PORT: "18796"
+          TCL_HA_TEST_URL: http://127.0.0.1:18796
+          TCL_PHOTO_TEST_URL: http://127.0.0.1:18796
+        run: |
+          python -m tvcontrol --sandbox > "$RUNNER_TEMP/tcl-webkit-sandbox.log" 2>&1 &
+          sandbox_pid=$!
+          trap 'kill "$sandbox_pid" 2>/dev/null || true; wait "$sandbox_pid" 2>/dev/null || true' EXIT
+          ready=0
+          for attempt in $(seq 1 60); do
+            if curl --fail --silent "$TCL_HA_TEST_URL/healthz" > /dev/null; then
+              ready=1
+              break
+            fi
+            if ! kill -0 "$sandbox_pid" 2>/dev/null; then
+              cat "$RUNNER_TEMP/tcl-webkit-sandbox.log"
+              exit 1
+            fi
+            sleep 1
+          done
+          if [ "$ready" -ne 1 ]; then
+            cat "$RUNNER_TEMP/tcl-webkit-sandbox.log"
+            exit 1
+          fi
+          node --test --test-concurrency=1 controller/tests/ha-cards.webkit.mjs controller/tests/photo-upload.webkit.mjs
+
+  release-safety:
+    name: Windows release acceptance
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Synthetic signing, test-report and size gates
+        shell: powershell
+        run: |
+          Import-Module Pester -RequiredVersion 3.4.0 -Force
+          $result = Invoke-Pester .\scripts\tests\BuildLauncher.Tests.ps1 -PassThru
+          if ($result.TotalCount -eq 0 -or $result.FailedCount -ne 0 -or $result.SkippedCount -ne 0) {
+            throw 'Release acceptance tests did not pass completely.'
+          }

@@ -19,7 +19,7 @@ separately.
 Back up all of the following through a private NAS/backup channel:
 
 - The complete controller data volume, including SQLite and any sidecars,
-  images, revisions, ADB identity and Home recovery backups.
+  images, revisions, ADB identity, Home and owned remote-key recovery backups.
 - Local production Compose/override/environment settings.
 - Any separately mounted HA token file, under an appropriate secret backup
   policy.
@@ -36,8 +36,14 @@ use a deliberately implemented consistent SQLite/volume backup strategy.
 Copying only the main `.sqlite3` file while WAL writes are active is not a
 reliable backup.
 
-Stopping the controller temporarily stops NAS timer enforcement, live-file
-delivery and automatic HOME failback. Keep the TV in a known safe state
+The TV's direct-HA source/connection is separate: its token is Keystore-encrypted
+and is not exported in the NAS backup. Keep the dedicated HA account/token
+recovery process private; app-data clearing or a different TV is not a supported
+way to migrate the encrypted connection.
+
+Stopping the controller temporarily stops NAS timer enforcement, backend
+live-file delivery and automatic HOME failback. Direct-card readings use their
+own TV-to-HA path. Keep the TV in a known safe state
 during the window. Do not delete the data volume or stop unrelated projects.
 
 ## Update the controller
@@ -57,9 +63,28 @@ during the window. Do not delete the data volume or stop unrelated projects.
    recovery state are preserved. Confirm HA data reconnects if configured.
 9. Refresh the phone/browser to load the new UI.
 
-Controller 2.6.23's photo changes do not require replacing native APK
-2.6.18-tcl. Only use **Install & open clean launcher** when a native update is
-actually intended, with a compatible signing identity.
+The older controller 2.6.23 photo release did not require replacing native
+2.6.18-tcl. The current **2.6.26 source candidate does require its matching
+native 2.6.26-tcl** for direct HA, Haval and remote-key changes. Use
+**Install & open clean launcher** only during a deliberate maintenance window,
+with the original compatible signing identity. No uninstall/data clear is
+needed or acceptable as a signature-mismatch workaround.
+
+### Direct source and remote-key recovery
+
+Follow [direct-HA setup and explicit rollback](DIRECT_HA.md), keeping TV and
+NAS credentials separate. Mapping transfer does not select a source.
+In the TV connection screen, **Use backend readings (explicit rollback)**
+retains the encrypted TV connection; **Forget TV token and use backend readings**
+also removes it. Revoke an unused token in HA separately. Neither action is
+a HOME-mode switch.
+
+The remote-key service is distinct from the compatibility HOME redirect.
+Owned service enable/restore metadata must preserve unrelated accessibility
+services and the previous accessibility setting. Do not enable HomeOverride
+alongside native HOME, globally clear accessibility services or claim an
+injected key proves a physical remote works. Use the on-screen Settings
+shortcut while diagnosing the physical gear button.
 
 ### Roll back deliberately
 
@@ -135,6 +160,9 @@ The portal's restore action is preferable because it uses the recorded states.
 | HA iframe is blank/unavailable | Exact HTTPS origin, same-site cookies, phone reachability, custom card installation | Use direct Open TCL controls and fix only the intended view/settings |
 | Energy is stale, negative or unavailable | Source freshness, actual sensor units/signs, cloud-quality flags and TV delivery | Compare real HA readings; do not force zero or substitute fixtures |
 | Weather has no forecast | Correct `weather.*` entity, units and daily subscription support | Choose a supported source and read the explicit error |
+| Direct selected but portal preview differs | Portal previews remain backend readings; actual TV source/mappings/token are separate | Inspect the native cards and use the direct-HA guide; do not silently switch source |
+| Haval charging unknown | Exact battery `%` entity, `on`/`off` binary state and source freshness | Repair the feed; unknown is not Not charging |
+| Physical gear button does nothing | Owned remote-key service, firmware and on-screen Settings shortcut | Test the real remote during maintenance; preserve unrelated accessibility settings |
 | Timer did not stop playback | Rule enabled, selected foreground app, timezone, observed usage and ADB health | Check actual observations; offline gaps are not charged |
 | Google TV flashes before Clean Home | Compatibility redirect is active or native mode failed verification | Review Home mode; do not bulk-disable packages |
 | APK update reports incompatible signatures | APK signing certificate differs from installed one | Use the original signed release/key; do not uninstall to bypass the protection |

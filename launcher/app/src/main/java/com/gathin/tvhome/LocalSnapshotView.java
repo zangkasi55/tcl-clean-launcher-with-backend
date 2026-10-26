@@ -17,6 +17,8 @@ import java.util.concurrent.Executors;
 
 abstract class LocalSnapshotView extends View {
     protected final float density;
+    private final boolean direct;
+    private HaCards haCards;
     private ExecutorService loader;
     private int generation;
     private String stamp = "";
@@ -52,6 +54,7 @@ abstract class LocalSnapshotView extends View {
     LocalSnapshotView(Context context, AttributeSet attrs) {
         super(context, attrs);
         density = getResources().getDisplayMetrics().density;
+        direct = new HaCredentials(context).direct();
         setFocusable(false);
         setImportantForAccessibility(IMPORTANT_FOR_ACCESSIBILITY_YES);
     }
@@ -59,9 +62,37 @@ abstract class LocalSnapshotView extends View {
     protected abstract String snapshotName();
     protected abstract void applySnapshot(JSONObject snapshot, boolean failed);
 
+    final void bindHaCards(HaCards owner) {
+        if (haCards == owner) return;
+        if (haCards != null) haCards.detach(this);
+        haCards = owner;
+        if (direct && isAttachedToWindow()) {
+            applySnapshot(null, true);
+            haCards.attach(this);
+        }
+    }
+
+    final boolean directVisible() {
+        return isAttachedToWindow() && isShown() && getWindowVisibility() == VISIBLE;
+    }
+
+    final void directSnapshot(JSONObject snapshot) {
+        if (direct) applySnapshot(snapshot, false);
+    }
+
+    protected float panelWidth(float available, float screenWidth) {
+        return EnergyLayout.width(available, screenWidth);
+    }
+
     @Override protected void onAttachedToWindow() {
         super.onAttachedToWindow();
-        loader = Executors.newSingleThreadExecutor();
+        if (direct) {
+            if (haCards != null) haCards.attach(this);
+            else {
+                Log.w("HaCards", "missing_connection_owner");
+                applySnapshot(null, true);
+            }
+        } else loader = Executors.newSingleThreadExecutor();
         restartRefresh();
     }
 
@@ -70,6 +101,7 @@ abstract class LocalSnapshotView extends View {
         generation++;
         if (loader != null) loader.shutdownNow();
         loader = null;
+        if (haCards != null) haCards.detach(this);
         super.onDetachedFromWindow();
     }
 
@@ -85,6 +117,10 @@ abstract class LocalSnapshotView extends View {
 
     private void restartRefresh() {
         if (refresh == null) return;
+        if (direct) {
+            if (haCards != null) haCards.update();
+            return;
+        }
         generation++;
         removeCallbacks(refresh);
         if (loader != null && isAttachedToWindow() && isShown()
@@ -94,7 +130,7 @@ abstract class LocalSnapshotView extends View {
     @Override protected void onMeasure(int widthSpec, int heightSpec) {
         int available = MeasureSpec.getSize(widthSpec);
         float screenWidth = getResources().getDisplayMetrics().widthPixels / density;
-        int width = Math.round(EnergyLayout.width(available / density, screenWidth) * density);
+        int width = Math.round(panelWidth(available / density, screenWidth) * density);
         setMeasuredDimension(resolveSize(width, widthSpec),
                 resolveSize(Math.round(EnergyLayout.HEIGHT * density), heightSpec));
     }

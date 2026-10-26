@@ -13,7 +13,7 @@ PowerShell unless a block is explicitly labeled Bash.
 - Node.js 24 is the documented photo-tool validation environment.
 - JDK 17, Android SDK platform 34 and build-tools 34.0.0 for the APK only.
 - Docker with Compose v2 for image testing/packaging, not for the Python sandbox.
-- WebKit browser binaries for the photo browser tests.
+- WebKit browser binaries for direct-mapping and photo browser tests.
 
 Use the committed Gradle wrapper. Do not install a different global Gradle
 to work around a wrapper error. Runtime/third-party sources and license
@@ -130,22 +130,26 @@ Then, in another terminal from the repository root:
 ```powershell
 npm --prefix .\controller exec -- playwright-core install webkit
 $env:TCL_PHOTO_TEST_URL = 'http://127.0.0.1:18796'
-npm --prefix .\controller run test:photos:webkit
+$env:TCL_HA_TEST_URL = 'http://127.0.0.1:18796'
+node --test --test-concurrency=1 .\controller\tests\ha-cards.webkit.mjs .\controller\tests\photo-upload.webkit.mjs
 ```
 
-The browser runner refuses writes unless status explicitly reports
+Both browser runners refuse writes unless status explicitly reports
 `sandbox.real_device_access === false`. It tests repeated saving/reloading,
 EXIF rotation, large source preparation, actual HEIC/HEIF fallback decoding,
 crop behavior, failure/retry and mobile orientation. The fixtures are original
-synthetic patterns, not personal photos. Stop the test sandbox when done.
+synthetic patterns, not personal photos. Direct-mapping tests also verify
+saved-only transfer, visible transport errors, unsaved edits surviving polling
+and unrelated saves, and separation from backend/theme/HOME/installation.
+Run the two suites sequentially when they share a sandbox. Stop it when done.
 
-The npm script paths currently use Windows backslashes. On macOS/Linux,
-invoke the entry points directly from `controller/` after `npm ci`:
+The npm scripts use portable paths. On macOS/Linux, equivalent direct entry
+points from `controller/` after `npm ci` are:
 
 ```bash
 node --test tests/photo-tools.test.mjs
 npx playwright-core install webkit
-TCL_PHOTO_TEST_URL=http://127.0.0.1:18796 node --test tests/photo-upload.webkit.mjs
+TCL_HA_TEST_URL=http://127.0.0.1:18796 TCL_PHOTO_TEST_URL=http://127.0.0.1:18796 node --test --test-concurrency=1 tests/ha-cards.webkit.mjs tests/photo-upload.webkit.mjs
 node ../scripts/vendor-photo-converter.mjs
 ```
 
@@ -186,9 +190,23 @@ On Windows:
 .\scripts\build-launcher.ps1
 ```
 
-This runs JVM tests, creates/reuses a private signing identity, builds
-`dist\tvhome-release.apk`, verifies its signature and records native test
-totals. It recognizes portable tools under `%LOCALAPPDATA%\TclTvBuild`.
+This runs native tests, Android lint and the release build using bounded
+workers and external build/cache directories. It creates/reuses a private
+signing identity, verifies the candidate signature and requires **1-409,600
+bytes inclusive**, positive executed tests and zero failures/errors/skips.
+An existing accepted APK is replaced atomically only after these gates and
+signer continuity checks pass. It recognizes portable tools under
+`%LOCALAPPDATA%\TclTvBuild`. Explicitly skipping tests is not a tested release.
+
+The synthetic acceptance regressions use no real signing identity:
+
+```powershell
+Import-Module Pester -RequiredVersion 3.4.0 -Force
+$result = Invoke-Pester .\scripts\tests\BuildLauncher.Tests.ps1 -PassThru
+if ($result.TotalCount -eq 0 -or $result.FailedCount -ne 0 -or $result.SkippedCount -ne 0) {
+    throw 'Release acceptance regressions did not pass completely.'
+}
+```
 
 Private signing files live under `%LOCALAPPDATA%\TclTvBuild\signing`, outside
 the repository. **Back up both the keystore and password file securely.**
@@ -202,18 +220,19 @@ do not uninstall a user's production launcher to bypass a signature mismatch.
 
 ## Build the container
 
-The Dockerfile needs `dist\tvhome-release.apk`. Either build your own correctly
-signed APK as above or download the release's APK and verify its checksum:
+The Dockerfile needs `dist\tvhome-release.apk`. For current 2.6.26 source,
+build its matching native APK as above:
 
 ```powershell
-New-Item -ItemType Directory -Path .\dist -Force | Out-Null
-gh release download v2.6.23 --repo zangkasi55/tcl-clean-launcher-with-backend --pattern tvhome-release.apk --dir .\dist
+.\scripts\build-launcher.ps1
 docker compose build
 ```
 
-Verify the download against the release checksum as in
-[installation](INSTALLATION.md#1-download-and-verify-a-release). Downloading
-an existing release preserves its signing identity; recompiling does not.
+The existing v2.6.23 release APK is older and lacks direct HA. To use that
+release, use its complete matching ZIP/build context and verify the
+[download checksums](INSTALLATION.md#1-download-and-verify-a-release), rather
+than mixing components. Recompiling with a new signing key cannot update an
+existing differently signed installation in place.
 
 ```mermaid
 flowchart LR
@@ -279,10 +298,12 @@ $env:CLEANYOURTV_STRICT = '1'
 python -m unittest discover -s tests -p test_examples.py -v
 ```
 
-The existing GitHub workflow runs the lists/tools/docs and native launcher
-jobs, including lint and the under-400-KiB APK threshold. It does **not**
-automatically run the backend or photo suites. State their local results
-explicitly in PRs; do not treat a green workflow as proof of unrun tests.
+The GitHub workflow runs lists/tools/docs, native tests/lint/build and the
+exact **1-409,600-byte** APK gate. Separate jobs run controller pytest/Ruff,
+Node photo tests, sequential isolated WebKit mapping/photo tests and Windows
+synthetic release acceptance. State local results in PRs as well. None of
+these jobs establishes physical TV, manufacturer-cloud, remote or iPhone
+acceptance.
 
 The optional [performance benchmark](../scripts/benchmark-performance.py)
 uses offline work counts, not claimed physical-TV frame rates:
@@ -294,6 +315,8 @@ uses offline work counts, not claimed physical-TV frame rates:
 ## Release checklist
 
 - [ ] Relevant backend, Node, WebKit and native suites pass.
+- [ ] Direct-mode TLS/Keystore, real card freshness/lifecycle, backend independence
+      and explicit rollback are verified on the intended TV before hardware claims.
 - [ ] Firmware/iPhone claims distinguish emulation from physical tests.
 - [ ] UI/Compose release versions and native version are intentionally chosen.
 - [ ] Signing identity is preserved; private keys never enter source/assets.

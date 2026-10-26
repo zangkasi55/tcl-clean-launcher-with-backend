@@ -25,6 +25,19 @@
     <string name="home_settings">Choose default home</string>
     <string name="home_settings_help">Select your original home to stop using CleanYourTV as Home, or CleanYourTV to switch back. The original launcher must be enabled and your TV must provide a home picker; use the restore script first if it was disabled.</string>
     <string name="launcher_settings">Launcher settings</string>
+    <string name="ha_settings">Home Assistant card connection</string>
+    <string name="ha_setup_help">Energy, Haval and Weather can connect straight to Home Assistant. First send saved entity mappings from the controller website. Enter a trusted HTTPS address and a dedicated TV access token here. The token stays encrypted on this TV; it is never sent to the management backend. No vehicle controls are enabled. A Home Assistant token still carries its account permissions: use a dedicated non-admin account and keep the token private.</string>
+    <string name="ha_origin_hint">Home Assistant HTTPS origin (no /api path)</string>
+    <string name="ha_token_hint">Dedicated TV access token</string>
+    <string name="ha_direct_selected">Direct mode selected. No backend readings are used, even if HA is unavailable. Saving replaces the TV connection.</string>
+    <string name="ha_backend_selected">Backend mode selected. Existing readings and management are unchanged.</string>
+    <string name="ha_save_direct">Save on TV and use direct HA</string>
+    <string name="ha_use_backend">Use backend readings (explicit rollback)</string>
+    <string name="ha_forget">Forget TV token and use backend readings</string>
+    <string name="ha_forget_warning">Erase the token stored on this TV and select backend readings? Also revoke this token in Home Assistant if it is no longer needed.</string>
+    <string name="ha_invalid_input">Enter an HTTPS origin without paths, credentials or query parameters, and a nonempty token without whitespace.</string>
+    <string name="ha_saving">Saving securely on this TV...</string>
+    <string name="ha_save_failed">The change could not be saved securely. Reopen this screen to check the selected source, then try again.</string>
     <string name="columns_label">Apps per row</string>
     <string name="animations_state">Animations: %1$s</string>
     <string name="advanced_effects">Advanced effects</string>
@@ -37,8 +50,8 @@
     <string name="off">Off</string>
     <string name="enable">Enable</string>
     <string name="input_key_service_description">Opens the input switcher when the remote\'s Input button is pressed.</string>
-    <string name="home_key_name">Home button</string>
-    <string name="home_key_description">Makes the remote\'s Home button open this launcher.</string>
+    <string name="home_key_name">Home and Settings buttons</string>
+    <string name="home_key_description">Opens TV settings for the remote\'s Settings button, and Clean Home for remotes with an alternate Home key. Other buttons pass through unchanged. Does not read screen content.</string>
     <string name="card_prompt_title">New card from %1$s</string>
     <string name="card_prompt_body">%1$s can show a card on your home screen. Keeping it hidden leaves the app\'s normal tile as it is.</string>
     <string name="card_prompt_names">The card is named \'%1$s\'. The app is \'%2$s\'.</string>
@@ -75,4 +88,11 @@
     <string name="energy_unavailable">No live readings</string>
     <string name="home_override_name">Clean Home compatibility</string>
     <string name="home_override_description">Opens the clean launcher when Google TV Home appears. Does not read screen content or capture key presses. Restore original Home in the controller to turn this off.</string>
+    <string name="vehicle_title">Haval</string>
+    <string name="vehicle_charging">Charging</string>
+    <string name="vehicle_not_charging">Not charging</string>
+    <string name="vehicle_activity_unknown">Unknown</string>
+    <string name="vehicle_last_activity">Last: %1$s</string>
+    <string name="vehicle_unavailable">Unavailable</string>
+    <string name="vehicle_description">Haval, %1$s, %2$s, %3$s</string>
 </resources>

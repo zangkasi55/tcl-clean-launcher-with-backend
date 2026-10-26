@@ -114,6 +114,7 @@ public class AppAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
 
     private final Context ctx;
     private final TileListener listener;
+    private final HaCards haCards;
     private final int dockSize;
     /** Dock order (config.xml dock_apps, or a theme's config.json). */
     private final List<String> favourites;
@@ -126,14 +127,16 @@ public class AppAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
     private final boolean showHomeSettings;
     private final boolean energyPanel;
     private final boolean weatherPanel;
+    private final boolean vehiclePanel;
     private boolean allAppsPage;
     /** Calmer motion for weak GPUs (config.xml, reduced_motion): no overshoot, shorter fades. */
     private final boolean reducedMotion;
     private final List<Entry> items = new ArrayList<>();
 
-    AppAdapter(Context ctx, TileListener listener, int dockSize, Config cfg) {
+    AppAdapter(Context ctx, TileListener listener, int dockSize, Config cfg, HaCards haCards) {
         this.ctx = ctx;
         this.listener = listener;
+        this.haCards = haCards;
         this.dockSize = dockSize;
         this.favourites = cfg.dockApps;
         this.hidden = new HashSet<>(cfg.hiddenApps);
@@ -144,6 +147,7 @@ public class AppAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
         this.showHomeSettings = cfg.showHomeSettingsShortcut;
         this.energyPanel = cfg.energyPanel;
         this.weatherPanel = cfg.weatherPanel;
+        this.vehiclePanel = cfg.vehiclePanel;
         this.reducedMotion = cfg.reducedMotion;
         // Tiles keep their identity across reload(), so a focused tile stays on its app instead of
         // its view being rebound to whatever app now sits in that slot.
@@ -269,7 +273,8 @@ public class AppAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
     public RecyclerView.ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
         if (viewType == 1) {
             return new PanelHolder(LayoutInflater.from(parent.getContext())
-                    .inflate(R.layout.item_home_panel, parent, false), energyPanel, weatherPanel);
+                    .inflate(R.layout.item_home_panel, parent, false), energyPanel, weatherPanel,
+                    vehiclePanel, haCards);
         }
         View v = LayoutInflater.from(parent.getContext()).inflate(R.layout.item_app, parent, false);
         float density = parent.getResources().getDisplayMetrics().density;
@@ -376,7 +381,7 @@ public class AppAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
 
     private int panelPosition() {
         return GridNavigation.panelPosition(items.size(), dockSize,
-                energyPanel || weatherPanel, allAppsPage);
+                energyPanel || weatherPanel || vehiclePanel, allAppsPage);
     }
 
     int tileCount() {
@@ -399,13 +404,23 @@ public class AppAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
     }
 
     private static final class PanelHolder extends RecyclerView.ViewHolder {
-        PanelHolder(View view, boolean energy, boolean weather) {
+        PanelHolder(View view, boolean energy, boolean weather, boolean vehicle, HaCards haCards) {
             super(view);
+            for (int id : new int[]{R.id.energyFlow, R.id.vehicleBattery, R.id.weatherForecast}) {
+                ((LocalSnapshotView) view.findViewById(id)).bindHaCards(haCards);
+            }
             view.findViewById(R.id.energyFlow).setVisibility(energy ? View.VISIBLE : View.GONE);
+            View battery = view.findViewById(R.id.vehicleBattery);
+            battery.setVisibility(vehicle ? View.VISIBLE : View.GONE);
+            int gap = Math.round(16 * view.getResources().getDisplayMetrics().density);
+            ViewGroup.MarginLayoutParams batteryParams =
+                    (ViewGroup.MarginLayoutParams) battery.getLayoutParams();
+            batteryParams.setMarginStart(energy ? gap : 0);
+            battery.setLayoutParams(batteryParams);
             View forecast = view.findViewById(R.id.weatherForecast);
             forecast.setVisibility(weather ? View.VISIBLE : View.GONE);
             ViewGroup.MarginLayoutParams params = (ViewGroup.MarginLayoutParams) forecast.getLayoutParams();
-            params.setMarginStart(energy ? Math.round(16 * view.getResources().getDisplayMetrics().density) : 0);
+            params.setMarginStart(energy || vehicle ? gap : 0);
             forecast.setLayoutParams(params);
         }
     }

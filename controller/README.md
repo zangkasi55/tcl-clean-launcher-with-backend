@@ -5,6 +5,11 @@ checklist](../docs/INSTALLATION.md), or [full documentation hub](../docs/README.
 The notes below provide additional implementation details. Example domains and
 dashboard names must be replaced with your own settings.
 
+**Current source: 2.6.26, with native 2.6.26-tcl / code 20.** Direct HA,
+Haval and remote-key changes await final physical-TV installation/provisioning
+and acceptance. The existing packaged v2.6.23 release uses the older native
+2.6.18-tcl and is not a direct-HA download.
+
 A separate Synology Container Manager project and a native Android TV launcher.
 It does not modify the Home Assistant container, flash firmware, clear app data,
 or provide package-disabling controls. Explicitly approved maintenance exceptions
@@ -20,8 +25,29 @@ can be recorded separately from the original app-state lists.
 - Persistent daily allowance, initially **YT / 40 minutes / Asia/Bangkok**.
 - Discrete standby, never a power toggle, after the daily allowance is exhausted.
 - Original Home/app inventory capture and staged install/restore controls.
-- Lower-screen **Energy Distribution** and daily weather cards, each 30% of screen width.
+- Lower-screen **Energy Distribution** and Weather at 30% each, with a read-only
+  **Haval battery/charging** card at 10% of full-screen width between them.
+- Optional direct-TV HA WSS readings, TV-private encrypted credentials and
+  explicit backend rollback, without routing direct readings through the NAS.
 - An isolated sandbox with a manual clock, simulated TV and energy scenarios.
+
+### Direct Home Assistant setup
+
+Follow the [complete direct-HA guide](../docs/DIRECT_HA.md) for diagrams,
+credential boundaries, exact setup, validation and rollback.
+
+Configure Energy in **Device & recovery**, and Weather/Haval in **Home design**.
+Save the separate direct mappings, then explicitly send the saved document
+to an authorized TV. This transfers no credentials, does not install an APK,
+change HOME or select the readings source. Backend feed configuration remains
+separate; unsaved edits survive polling and unrelated saves.
+
+On the TV, hold OK on Settings, open **Launcher settings > Home Assistant
+card connection**, privately enter a trusted HTTPS origin and dedicated
+non-admin TV token, then choose **Save on TV and use direct HA**.
+Direct mode uses lifecycle-bound WSS sessions and never silently falls back
+to backend snapshots. The browser preview still shows backend readings.
+Use the explicit rollback action in that TV screen to return to backend mode.
 
 ### Saving a wallpaper or logo
 
@@ -92,19 +118,22 @@ preview does not sample native app artwork.
 
 ### Weather forecast
 
-The weather card sits directly beside Energy Distribution; each card occupies
-**30% of the entire TV screen width**, with the remaining area left clear.
-It shows current temperature/conditions and three daily forecast entries, with
+Haval sits between Energy Distribution and Weather at **10% of full-screen
+width**; Energy and Weather each occupy **30%**. Weather
+shows current temperature/conditions and one to three daily forecast entries, with
 high/low temperatures in the source's Celsius or Fahrenheit units.
 
 Enable the weather feed and select an exact HA weather entity in Home design.
-The verified home source is **`weather.forecast_home`**, using HA's
+For example, select **`weather.home`**, using HA's
 `weather/subscribe_forecast` daily subscription plus its current-state subscription.
-Both use the existing backend HA URL/token-file authorization. No HA token, network
-permission, login page, or web browser is added to the TV.
+In backend mode, both use the NAS HA URL/token-file authorization; that token
+is never sent to the TV. In direct mode, they use the dedicated encrypted TV
+connection instead. The native app now declares network permission for WSS,
+not an embedded login page or web browser.
 
-Weather follows the same bounded, checksum-verified local-file delivery as energy.
-The two cards share the lifecycle-bound JSON reader and stop reading while hidden.
+In backend mode, Weather follows the same bounded, checksum-verified local-file
+delivery as Energy/Haval. The cards share the lifecycle-bound JSON reader and
+stop reading while hidden.
 Unchanged forecasts refresh the TV's contact timestamp at most once a minute.
 Loss of HA contact is marked stale after 15 minutes; missing forecasts/units or
 unsupported daily forecasts are explicit errors, never fabricated zero temperatures
@@ -301,7 +330,13 @@ do not broadly change NAS permissions or use world-writable folders.
 
 ### Updating an existing NAS installation
 
-Version **2.6.23** adds touch-friendly portrait-to-landscape wallpaper cropping and
+Current **2.6.26 source** adds direct HA, Haval and remote-key handling and needs
+its matching native build. Preserve the existing signing identity and app data.
+Publishing/building source is not physical installation or token provisioning.
+Use the [operations guide](../docs/OPERATIONS.md) and
+[direct-HA acceptance checklist](../docs/DIRECT_HA.md#3-verify-the-exact-outcome).
+
+The earlier **2.6.23** release added touch-friendly portrait-to-landscape wallpaper cropping and
 an explicit upload-and-save action, with browser-side preparation for large
 iPhone photos and automatic local HEIC/HEIF conversion. It does not require a launcher APK
 update. Version **2.6.20** restores live energy after HA moves its renderer into a shared
@@ -357,7 +392,7 @@ change HA's global internal/external URLs, controller security settings, or the
 TV's saved configuration. If the controller is unreachable or its embedded
 session fails even at a permitted origin, the direct action remains available.
 
-Use the **Nitarn Home / TCL TV** view while connected to the home LAN or the same
+Use the **TCL TV** view while connected to the home LAN or the same
 authorized VPN. For inline controls, open **Settings > Companion app**, select
 this HA server, and set its **Internal URL** to one of the exact HTTPS origins
 above. Check its external URL too if the app switches addresses away from home.
@@ -428,10 +463,11 @@ the configured balance tolerance (currently 50 W) and directional signs follow H
 The older individual-sensor mapping remains available when automatic HA-card binding
 is turned off. The sensor table below documents that legacy ESS-Link mapping.
 
-The **TV does not authenticate to Home Assistant**. The panel appears automatically
-with the clean home screen. No HA login page, token, or password is placed on the TV.
-Authentication to HA stays in the backend, or in the already-authorized HA browser
-used temporarily during sandbox development.
+In **backend mode**, the TV does not authenticate to HA; authorization stays
+on the NAS. In **direct mode**, the native launcher authenticates with the
+dedicated encrypted TV token, never the backend token. The panel appears with
+Home in either mode; no HA login page is embedded. See
+[source-specific setup](../docs/DIRECT_HA.md).
 
 The default development entry point now uses live data, not the example screenshot.
 For deliberate fixture testing only, select **Explicit simulated test data** under
@@ -505,10 +541,11 @@ configured sensors, not 30-second REST polling. Reported state changes are deliv
 immediately, with connection heartbeats while values are unchanged. HA controls the
 underlying sensor sampling rate; the display cannot invent faster hardware measurements.
 
-The backend delivers a small, checksum-verified local `energy.json` snapshot over
+In **backend mode**, the backend delivers a small, checksum-verified local `energy.json` snapshot over
 the existing authorized ADB channel after launcher installation. The native launcher
-checks the local file every **one second** while visible. It needs no network
-permission, embedded HA page, login token, or additional background service.
+checks the local file every **one second** while visible. That path needs no
+TV-to-HA authorization or additional background service. Direct mode instead
+uses visible-card WSS connections and never constructs the backend file loader.
 The browser uses a server-sent event stream instead of waiting for dashboard refresh.
 Loss of HA contact is labeled stale after 15 seconds. The TV receives that explicit
 stale/unavailable status without a grace period. Its separate local-delivery timeout
@@ -520,7 +557,7 @@ Last values are never replaced with simulated readings.
 ## Performance and responsiveness
 
 Home and All apps are separate screens. Favorites sit low, with Energy Distribution
-and weather below them on the left and a clear area to their right. Down from favorites opens the
+Haval and Weather below them on the left and a clear area to their right. Down from favorites opens the
 complete installed-app catalog, including favorites. Up from its first row or Back
 returns Home; the remote Home button returns to the first favorite. Each page keeps
 its focused app when returning from another app, and the read-only energy row cannot

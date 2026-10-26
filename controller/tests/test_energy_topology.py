@@ -27,8 +27,8 @@ def bindings(offline=True):
         battery_charge_entity="sensor.ess_link_battery_charge_power",
         battery_discharge_entity="sensor.ess_link_battery_discharge_power",
         battery_soc_entity="sensor.ess_link_battery_soc",
-        enphase_monitor_entity="sensor.envoy_122219081316_current_power_production",
-        home_fallback_entity="sensor.envoy_122219081316_current_power_consumption",
+        enphase_monitor_entity="sensor.enphase_current_power_production",
+        home_fallback_entity="sensor.enphase_current_power_consumption",
         ess_solar_planned=True, ess_cloud_offline=offline, balance_tolerance_w=50)
 
 
@@ -42,8 +42,8 @@ def states():
         "sensor.ess_link_battery_charge_power": ("0.0", "kW"),
         "sensor.ess_link_battery_discharge_power": ("0.0", "kW"),
         "sensor.ess_link_battery_soc": ("16.0", "%"),
-        "sensor.envoy_122219081316_current_power_production": ("2.578", "kW"),
-        "sensor.envoy_122219081316_current_power_consumption": ("5.054", "kW"),
+        "sensor.enphase_current_power_production": ("2.578", "kW"),
+        "sensor.enphase_current_power_consumption": ("5.054", "kW"),
     }
     return {entity: {"entity_id": entity, "state": value, "attributes": {
         "unit_of_measurement": unit, "device_class": "battery" if unit == "%" else "power"}}
@@ -88,7 +88,7 @@ def test_live_balance_planned_pv_and_directional_meters_follow_the_ha_model():
         "sensor.ess_link_pv_power": "0.73", "sensor.ess_link_load_power": "2.18",
         "sensor.ess_link_grid_export_power": "0.63",
         "sensor.ess_link_battery_discharge_power": "0.82",
-        "sensor.envoy_122219081316_current_power_production": "0.73",
+        "sensor.enphase_current_power_production": "0.73",
     }.items():
         readings[entity]["state"] = value
     model = topology_from_states(bindings(False), readings)
@@ -110,14 +110,14 @@ def test_live_balance_planned_pv_and_directional_meters_follow_the_ha_model():
 
 def test_signed_enphase_standby_and_invalid_sensor_metadata_are_not_zero():
     readings = states()
-    readings["sensor.envoy_122219081316_current_power_production"]["state"] = "-0.04"
+    readings["sensor.enphase_current_power_production"]["state"] = "-0.04"
     model = topology_from_states(bindings(), readings)
     edge = next(item for item in model.edges if item.id == "enphase-inverter")
     assert model.enphase_monitor == -40
     assert edge.direction == -1
     assert edge.watts == 40
     assert edge.active
-    readings["sensor.envoy_122219081316_current_power_consumption"]["attributes"] = {
+    readings["sensor.enphase_current_power_consumption"]["attributes"] = {
         "unit_of_measurement": "kWh", "device_class": "energy"}
     invalid = topology_from_states(bindings(), readings)
     assert invalid.home_display is None
@@ -175,7 +175,7 @@ def test_templated_card_recovers_the_old_negative_nighttime_sample(tmp_path):
                   topology_dashboard="energy-dashboard", topology_view="Home").model_dump())
         store.put("inventory", {"installed": [LAUNCHER]})
         night = states()
-        night["sensor.envoy_122219081316_current_power_production"]["state"] = "-0.001"
+        night["sensor.enphase_current_power_production"]["state"] = "-0.001"
         service.accept_states(night, bindings(False))
         assert service.snapshot().topology.enphase_monitor == -1
         service.unavailable("The HA Energy Distribution card bindings are invalid.")
@@ -186,7 +186,7 @@ def test_templated_card_recovers_the_old_negative_nighttime_sample(tmp_path):
         card.pop("custom_fields")
         card["template"] = "ess_energy_shared_renderer"
         fresh = states()
-        fresh["sensor.envoy_122219081316_current_power_production"]["state"] = "3.438"
+        fresh["sensor.enphase_current_power_production"]["state"] = "3.438"
         service.accept_states(fresh, bindings_from_dashboard(config, "Home"))
         assert service.snapshot().status == "live"
         assert service.snapshot().topology.enphase_monitor == 3438

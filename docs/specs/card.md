@@ -153,9 +153,12 @@ any violation drops that one card, with a log line and no other effect.
 
 ## Security
 
-- The launcher never installs, downloads, enables or disables anything, binds no service, loads no
-  code, views or resources from a module beyond the one XML file and the label and artwork every
-  tile already uses, and has no network permission.
+- The module-discovery path never installs, downloads, enables or disables anything,
+  binds no module service and loads no code, views or resources from a module
+  beyond the one XML file and the label and artwork every tile already uses.
+  The current TCL launcher separately declares network permission for optional
+  [direct Home Assistant readings](../DIRECT_HA.md); modules cannot configure
+  or access that connection or its credentials.
 - Nothing is shown until the owner says so, and the answer is pinned to the signing key. The owner
   judges a package name and an app label; the launcher judges the digest.
 - A card can only make its own activity look different; it cannot start anything else. Launching it

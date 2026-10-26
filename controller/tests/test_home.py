@@ -1,3 +1,4 @@
+import shlex
 from datetime import datetime, timedelta
 
 import pytest
@@ -6,6 +7,7 @@ from tvcontrol.device import Device, assert_preserved
 from tvcontrol.home import (
     CLEAN_HOME,
     HOME_PACKAGES,
+    REMOTE_KEY_SERVICE,
     SETUP_HOME,
     STOCK_HOME,
     HomeBackup,
@@ -31,6 +33,8 @@ class HomeShell:
         self.fail = None
         self.unavailable = False
         self.wrong_home = None
+        self.services = []
+        self.accessibility = "0"
 
     def __call__(self, command):
         self.commands.append(command)
@@ -39,6 +43,16 @@ class HomeShell:
             raise DeviceError("Injected TV command failure")
         if command == "getprop ro.build.version.sdk":
             return self.sdk
+        if command == "settings get secure enabled_accessibility_services":
+            return ":".join(self.services)
+        if command == "settings get secure accessibility_enabled":
+            return self.accessibility
+        if command.startswith("settings put secure enabled_accessibility_services "):
+            self.services = [value for value in shlex.split(command)[4].split(":") if value]
+            return ""
+        if command.startswith("settings put secure accessibility_enabled "):
+            self.accessibility = command.split()[-1]
+            return ""
         if command.startswith("dumpsys package "):
             package = command.split()[-1]
             return (f"Packages:\n  Package [{package}]\n"
@@ -163,6 +177,91 @@ def test_manual_restore_restores_defaults_not_just_explicit_enabled(home):
     assert not guard.restore("Do not repeat")
     assert shell.commands.index(f"pm default-state --user 0 {STOCK_HOME}") < \
         shell.commands.index(f"pm enable --user 0 {SETUP_HOME}")
+
+
+def test_native_home_enables_settings_keys_and_restores_the_original_accessibility_state(home):
+    shell, guard = home
+    arm(shell, guard)
+    assert shell.services == [REMOTE_KEY_SERVICE]
+    assert shell.accessibility == "1"
+    assert guard._read_remote_keys_backup().added
+    assert guard._read_remote_keys_backup().accessibility == "0"
+    assert shell.commands.index("settings put secure accessibility_enabled 1") < \
+        shell.commands.index(f"pm disable-user --user 0 {SETUP_HOME}")
+    guard.restore("Manual recovery")
+    assert shell.services == []
+    assert shell.accessibility == "0"
+    assert not guard.keys_path.exists()
+
+
+def test_remote_keys_preserve_other_services_and_services_enabled_later(home):
+    shell, guard = home
+    shell.services = ["com.example.reader/.Service"]
+    shell.accessibility = "1"
+    arm(shell, guard)
+    shell.services.append("com.example.magnifier/.Service")
+    guard.restore("Manual recovery")
+    assert shell.services == ["com.example.reader/.Service", "com.example.magnifier/.Service"]
+    assert shell.accessibility == "1"
+
+
+def test_remote_keys_never_activate_other_selected_but_disabled_services(home):
+    shell, guard = home
+    shell.services = ["com.example.reader/.Service"]
+    prepared = guard.preflight(ORIGINAL_HOME)
+    with pytest.raises(DeviceError, match="selected but disabled"):
+        guard.activate(prepared)
+    assert shell.services == ["com.example.reader/.Service"]
+    assert shell.accessibility == "0"
+    assert shell.states == {STOCK_HOME: 0, SETUP_HOME: 1}
+
+
+@pytest.mark.parametrize("enabled", ["0", "1"])
+def test_preexisting_remote_key_selection_is_preserved_after_restore(home, enabled):
+    shell, guard = home
+    original = f"{LAUNCHER}/{LAUNCHER}.HomeKeyService"
+    shell.services = [original]
+    shell.accessibility = enabled
+    arm(shell, guard)
+    assert not guard._read_remote_keys_backup().added
+    guard.restore("Manual recovery")
+    assert shell.services == [original]
+    assert shell.accessibility == enabled
+
+
+def test_native_monitor_repairs_remote_keys_after_apk_update_without_opening_home(home):
+    shell, guard = home
+    arm(shell, guard)
+    shell.services = []
+    shell.accessibility = "0"
+    shell.commands.clear()
+    guard.check(100)
+    assert shell.services == [REMOTE_KEY_SERVICE]
+    assert shell.accessibility == "1"
+    assert not any(command.startswith(("am start", "input keyevent")) for command in shell.commands)
+
+
+def test_older_active_backups_gain_remote_support_without_replacing_other_services(home):
+    shell, guard = home
+    arm(shell, guard)
+    guard.keys_path.unlink()
+    shell.services = ["com.example.reader/.Service"]
+    guard.check(100)
+    assert shell.services == ["com.example.reader/.Service", REMOTE_KEY_SERVICE]
+    assert guard._read_remote_keys_backup().accessibility == "1"
+    guard.restore("Manual recovery")
+    assert shell.services == ["com.example.reader/.Service"]
+
+
+def test_failed_remote_key_enable_rolls_back_without_losing_other_services(home):
+    shell, guard = home
+    prepared = guard.preflight(ORIGINAL_HOME)
+    shell.fail = "settings put secure accessibility_enabled 1"
+    with pytest.raises(DeviceError, match="Injected"):
+        guard.activate(prepared)
+    assert shell.services == []
+    assert shell.accessibility == "0"
+    assert shell.states == {STOCK_HOME: 0, SETUP_HOME: 1}
 
 
 def test_failed_disable_rolls_back_both_packages_and_never_claims_active(home):

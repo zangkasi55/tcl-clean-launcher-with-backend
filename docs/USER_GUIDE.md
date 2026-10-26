@@ -30,8 +30,11 @@ a WebKit iPhone-sized viewport, not a physical-device certification. See
 | Back while in All apps | Return Home |
 | Home button | Return to Clean Home if your chosen HOME mode is working; focus the first favorite |
 | Return from an app | Restore that page's app focus where applicable |
+| OK on Settings shortcut | Open TV system settings |
+| Hold OK on Settings shortcut | Open Launcher settings, including Home Assistant card connection |
+| Physical Settings / gear | Open system settings when the firmware/owned remote-key service supports it; requires actual remote testing |
 
-Energy/weather cards are read-only and do not trap D-pad focus. The Home
+Energy/Haval/Weather cards are read-only and do not trap D-pad focus. The Home
 photo stays mostly clear above the lower favorites/information area.
 Firmware-specific Inputs, Settings and accessibility behavior should be
 checked on the real TV rather than inferred from a browser preview.
@@ -128,14 +131,23 @@ Save or Apply the change. Cancelling a new crop instead keeps the old image.
 **Undo previous theme change** restores a prior applied design when one is
 available; it is not a full TV or app-data restore.
 
-## Energy Distribution and weather
+## Energy Distribution, Haval and weather
 
-These cards require optional [backend HA configuration](CONFIGURATION.md#home-assistant-energy-and-weather).
-Each native card occupies 30% of screen width in the lower information row.
+Use optional [backend HA configuration](CONFIGURATION.md#home-assistant-energy-and-weather)
+or the current source candidate's [direct TV connection](DIRECT_HA.md).
+Energy and Weather each occupy 30% of full-screen width; Haval occupies
+exactly 10% between them. Haval shows battery percentage and Charging/Not
+charging, with no vehicle controls and no guessed off state when data is missing.
 Disabling a card changes visibility; it does not repair or reconfigure its
 underlying sensors.
 
-Read both source and delivery warnings. A live HA source can be healthy while
+In direct mode, save/send non-secret mappings in the portal and provision the
+dedicated token privately on the TV. Only the explicit TV connection action
+switches the source; saving a theme or mapping does not. Direct mode never
+silently falls back to backend readings.
+
+Portal previews still show backend data. Read both source and delivery
+warnings for that mode. A live backend HA source can be healthy while
 ADB delivery to the TV is delayed, and a reachable portal does not prove
 the TV is reachable. Stale/unavailable/offline/not-installed labels are not
 zero power. Negative measured standby draw can be legitimate and is not

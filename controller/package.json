@@ -3,9 +3,10 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "vendor:photos": "node ..\\scripts\\vendor-photo-converter.mjs",
-    "test:photos": "node --test tests\\photo-tools.test.mjs",
-    "test:photos:webkit": "node --test tests\\photo-upload.webkit.mjs"
+    "vendor:photos": "node ../scripts/vendor-photo-converter.mjs",
+    "test:photos": "node --test tests/photo-tools.test.mjs",
+    "test:photos:webkit": "node --test tests/photo-upload.webkit.mjs",
+    "test:ha:webkit": "node --test tests/ha-cards.webkit.mjs"
   },
   "devDependencies": {
     "heic-to": "1.6.6",

@@ -7,6 +7,12 @@ baseline, install/test the launcher, then choose Home mode**. Do not start by
 disabling the stock launcher. Existing streaming apps are not bundled, replaced
 or logged out.
 
+**Version scope:** the downloadable **v2.6.23** bundle below contains native
+**2.6.18-tcl**. Current **2.6.26 source** adds direct HA/Haval/remote changes
+and requires its matching native build plus separate physical acceptance.
+Follow [the direct-HA guide](DIRECT_HA.md) for that candidate; it is not
+already installed or provisioned by publishing the source.
+
 ## Requirements
 
 | Requirement | Notes |
@@ -17,8 +23,8 @@ or logged out.
 | Network | NAS must reach the TV's private IPv4 address. Reserve the TV's DHCP address if possible. Never forward ADB through the internet. |
 | HTTPS | A trusted certificate, a hostname the client can resolve, and an HTTPS reverse proxy to the controller. |
 | Browser | Modern desktop browser or iPhone Safari/HA Companion. Direct HTTPS access is the simplest first test. |
-| GitHub access | This repository is private. Sign in with an account invited by the owner before downloading or cloning. |
-| Optional HA | Reachable Home Assistant and a dedicated authorized token, stored only on the backend. |
+| GitHub access | The source and published release are public. GitHub CLI authentication may be used for downloads; issues/PRs require an account and direct writes require maintainer permission. |
+| Optional HA | Reachable HA and a dedicated token: NAS-only for backend feeds, TV-private encrypted storage for direct mode. The TV itself must reach trusted HTTPS/WSS in direct mode. |
 
 No root, firmware flashing, factory reset or Android SDK is required when
 using the release packages. A native-default preflight needs Android 11+

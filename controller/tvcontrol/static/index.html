@@ -5,9 +5,9 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="color-scheme" content="dark">
   <title>TCL Home Control</title>
-  <link rel="stylesheet" href="style.css?v=2.6.23">
+  <link rel="stylesheet" href="style.css?v=2.6.25">
   <script src="ha-live-bridge.js" defer></script>
-  <script src="app.js?v=2.6.23" type="module"></script>
+  <script src="app.js?v=2.6.25" type="module"></script>
 </head>
 <body>
   <section id="boot-panel" class="login-panel">
@@ -122,6 +122,13 @@
             </svg>
             <p id="energy-caption" class="energy-caption">Readings are not configured. Your app lineup remains unchanged.</p>
           </section>
+          <section id="vehicle-panel" class="vehicle-panel is-stale" aria-label="Haval battery status">
+            <h3>Haval</h3>
+            <div class="vehicle-battery" aria-hidden="true"><div id="vehicle-battery-fill"></div></div>
+            <strong id="vehicle-soc">--%</strong>
+            <span id="vehicle-activity">Unknown</span>
+            <span id="vehicle-status">Unavailable</span>
+          </section>
           <section id="weather-panel" class="weather-panel" aria-label="Weather forecast">
             <div class="weather-heading"><h3>Weather</h3><span id="weather-status">No forecast</span></div>
             <div class="weather-current"><strong id="weather-temperature">--</strong><span id="weather-condition">Waiting for Home Assistant</span></div>
@@ -138,6 +145,7 @@
         <div class="preview-navigation"><button id="preview-open-apps" class="secondary" type="button">Preview All apps</button><span class="hint">TV remote: Down opens All apps. Up from its first row or Back returns Home.</span></div>
         <p id="energy-details" class="hint" role="status"></p>
         <p id="weather-details" class="hint" role="status"></p>
+        <p id="vehicle-details" class="hint" role="status"></p>
         <fieldset id="theme-controls" class="theme-controls" aria-label="Home design settings">
         <div class="cards two-columns">
           <article class="card" data-image-kind="wallpaper">
@@ -159,6 +167,7 @@
             <p id="ambient-glow-state" class="hint" role="status">This separate app-colored layer can tint your photo. Turn it off for natural wallpaper colors; the gradient controls remain independent.</p>
             <label class="check-label"><input id="energy-panel-enabled" type="checkbox" checked> Energy flow below the app dock</label>
             <label class="check-label"><input id="weather-panel-enabled" type="checkbox" checked> Weather forecast beside Energy Distribution</label>
+            <label class="check-label"><input id="vehicle-panel-enabled" type="checkbox" checked> Haval battery beside Energy Distribution (10% screen width)</label>
             <label class="upload">Choose a wallpaper<input id="wallpaper-upload" type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif,.heic,.heif" aria-describedby="wallpaper-help wallpaper-state"></label>
             <p id="wallpaper-help" class="hint">Choose a JPEG, PNG, WebP, HEIC or HEIF photo up to 40 MiB / 60 megapixels. HEIC/HEIF converts automatically on your device; no external conversion service is used. Position the 16:9 crop below, then Upload &amp; save to system. Large photos are resized before upload. Apply to TV remains a separate step.</p>
             <section id="wallpaper-crop" class="wallpaper-crop" aria-labelledby="crop-heading" hidden>
@@ -197,16 +206,40 @@
             <p id="artwork-feedback" class="hint" data-theme-feedback role="status" hidden></p>
             <button id="artwork-reset" class="quiet">Reset to original YouTube artwork</button>
           </article>
+          <article class="card wide">
+            <p class="eyebrow">DIRECT TV TO HOME ASSISTANT</p><h3>Live cards without the backend data relay.</h3>
+            <p class="muted">Energy, Haval and Weather can connect directly from Clean Home to Home Assistant. On the TV, hold OK on the Settings shortcut, open Launcher settings &gt; Home Assistant card connection and enter a trusted HTTPS address and a dedicated TV access token. The token stays encrypted in the TV app; do not enter it in the website.</p>
+            <p class="hint">Edit Energy in Device &amp; recovery and Weather/Haval in Home design, then Save direct mappings to save all three together without polling Home Assistant. Send saved mappings updates only the mapping file, not the TV source or credentials. The individual Save backend buttons remain for the optional backend mode. Website previews show backend readings, not the TV's direct connection.</p>
+            <div class="image-actions">
+              <button id="ha-cards-save" class="primary" type="button">Save direct mappings</button>
+              <button id="ha-cards-load" class="secondary" type="button">Load saved direct mappings into forms</button>
+              <button id="ha-cards-export" class="secondary" type="button">Download saved mappings</button>
+              <button id="ha-cards-send" class="secondary" type="button">Send saved mappings to TV</button>
+            </div>
+            <p id="ha-cards-status" class="hint" role="status">Checking saved direct mappings...</p>
+          </article>
           <article class="card">
-            <div class="card-heading"><div><p class="eyebrow">YOUR LOCAL FORECAST</p><h3>Weather, without another login.</h3></div></div>
-            <p class="hint">Each card uses 30% of the TV screen width. Weather comes from the backend Home Assistant connection, never from a token on the TV.</p>
+            <div class="card-heading"><div><p class="eyebrow">YOUR LOCAL FORECAST</p><h3>Weather, directly or through the backend.</h3></div></div>
+            <p class="hint">Energy and Weather each use 30% of the TV screen width. The Haval battery card between them uses 10%. Direct mode reads Home Assistant on the TV; backend mode uses the controller feed.</p>
             <form id="weather-config-form">
               <label class="check-label"><input id="weather-feed-enabled" type="checkbox"> Enable weather feed</label>
               <label>Weather entity<input id="weather-entity" type="text" placeholder="weather.forecast_home" autocomplete="off"></label>
               <label>Source<select id="weather-transport"><option value="websocket">Live Home Assistant forecast</option></select></label>
-              <button class="secondary" type="submit">Save weather source</button>
+              <button class="secondary" type="submit">Save backend weather source</button>
             </form>
             <p id="weather-setup-status" class="hint" role="status"></p>
+          </article>
+          <article class="card">
+            <div class="card-heading"><div><p class="eyebrow">READ-ONLY VEHICLE STATUS</p><h3>Haval battery and charging.</h3></div></div>
+            <p class="hint">A separate card shows battery percentage and Charging / Not charging. Missing or stale readings are labelled explicitly, never assumed to be 0% or not charging. No vehicle controls or energy calculations are changed.</p>
+            <form id="vehicle-config-form">
+              <label class="check-label"><input id="vehicle-feed-enabled" type="checkbox"> Enable vehicle feed</label>
+              <label>Battery percentage entity<input id="vehicle-soc-entity" type="text" placeholder="sensor.your_vehicle_soc" autocomplete="off"></label>
+              <label>Charging activity entity<input id="vehicle-charging-entity" type="text" placeholder="binary_sensor.your_vehicle_charging_active" autocomplete="off"></label>
+              <label>Source<select id="vehicle-transport"><option value="websocket">Live Home Assistant vehicle status</option></select></label>
+              <button class="secondary" type="submit">Save backend vehicle source</button>
+            </form>
+            <p id="vehicle-setup-status" class="hint" role="status"></p>
           </article>
           <article class="card favorites-card">
             <div class="card-heading"><div><p class="eyebrow">FRONT AND CENTER</p><h3>Your favorite lineup.</h3></div><span class="tag">YT is not YouTube</span></div>
@@ -272,17 +305,17 @@
           </article>
           <article class="card wide"><p class="eyebrow">RECENT ACTIVITY</p><h3>Nothing happens silently.</h3><ul id="events" class="events"></ul></article>
           <article class="card wide">
-            <p class="eyebrow">READ-ONLY HOME ASSISTANT FEED</p><h3>Connect the real energy sensors later.</h3>
-            <p id="energy-setup-status" class="muted">Map the exact sensor IDs when Home Assistant is available. Tokens stay in a backend file, never on the TV or in this page.</p>
+            <p class="eyebrow">READ-ONLY HOME ASSISTANT FEED</p><h3>Map the real energy sensors.</h3>
+            <p id="energy-setup-status" class="muted">Use exact sensor IDs or the existing HA energy card. Direct TV credentials are entered only on the TV; backend credentials remain in their backend file.</p>
             <form id="energy-config-form">
               <label class="check-label"><input id="energy-feed-enabled" type="checkbox"> Enable energy readings</label>
               <label>Live energy connection<select id="energy-transport"></select></label>
               <label class="check-label"><input id="energy-ha-card" type="checkbox"> Match a Home Assistant Energy Distribution card automatically</label>
               <div class="form-grid">
-                <label>Dashboard URL path<input id="energy-ha-dashboard" placeholder="nitarn-home"></label>
+                <label>Dashboard URL path<input id="energy-ha-dashboard" placeholder="energy-dashboard"></label>
                 <label>View title or path<input id="energy-ha-view" value="Home"></label>
               </div>
-              <p class="hint">This reads the selected card's declared sensor bindings, commissioning/offline flags and balance tolerance. Dashboard JavaScript is never executed by the controller. The individual sensor fields below are used only when this option is off.</p>
+              <p class="hint">This reads the selected card's declared sensor bindings, commissioning/offline flags and balance tolerance. Dashboard JavaScript is never executed by the importer. The individual sensor fields below are used only when this option is off. Clear unused signed sensors when using directional pairs.</p>
               <div class="form-grid">
                 <label>Solar power sensor<input id="energy-entity-solar" placeholder="sensor.your_solar_power"></label>
                 <label>Home power sensor<input id="energy-entity-home" placeholder="sensor.your_home_power"></label>
@@ -296,10 +329,10 @@
               </div>
               <label class="check-label"><input id="energy-grid-sign" type="checkbox" checked> Positive grid readings mean import</label>
               <label class="check-label"><input id="energy-battery-sign" type="checkbox" checked> Positive battery readings mean discharge</label>
-              <button type="submit" class="secondary">Save energy sensor mapping</button>
+              <button type="submit" class="secondary">Save backend energy source</button>
               <button id="energy-refresh" type="button" class="quiet">Refresh energy readings</button>
             </form>
-            <p class="hint">Use instantaneous W/kW sensors, not daily kWh totals. Choose either one signed sensor or a separate pair for grid and battery. Live updates never fall back to simulated readings. No authentication prompt or token is used on the TV.</p>
+            <p class="hint">Use instantaneous W/kW sensors, not daily kWh totals. Choose either one signed sensor or a separate pair for grid and battery. Live updates never fall back to simulated readings. Direct mode never silently falls back to backend snapshots; switch explicitly in the TV's Home Assistant cards settings.</p>
           </article>
         </div>
       </section>

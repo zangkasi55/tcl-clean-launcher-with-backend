@@ -1,0 +1,376 @@
+{
+  "bindings": {
+    "enphase_solar_entity": "sensor.example_pv",
+    "ess_solar_entity": "sensor.example_planned_pv",
+    "home_entity": "sensor.example_home",
+    "grid_import_entity": "sensor.example_import",
+    "grid_export_entity": "sensor.example_export",
+    "battery_charge_entity": "sensor.example_charge",
+    "battery_discharge_entity": "sensor.example_discharge",
+    "battery_soc_entity": "sensor.example_soc",
+    "enphase_monitor_entity": "sensor.example_monitor",
+    "home_fallback_entity": "sensor.example_ct",
+    "ess_solar_planned": true,
+    "ess_cloud_offline": false,
+    "balance_tolerance_w": 50
+  },
+  "readings": {
+    "sensor.example_pv": ["2", "kW", "power"],
+    "sensor.example_planned_pv": ["0", "W", "power"],
+    "sensor.example_home": ["3000", "W", "power"],
+    "sensor.example_import": ["0.5", "kW", "power"],
+    "sensor.example_export": ["0", "W", "power"],
+    "sensor.example_charge": ["0", "W", "power"],
+    "sensor.example_discharge": ["0.5", "kW", "power"],
+    "sensor.example_soc": ["60", "%", "battery"],
+    "sensor.example_monitor": ["2100", "W", "power"],
+    "sensor.example_ct": ["2900", "W", "power"]
+  },
+  "cases": [
+    {
+      "name": "balanced_import_and_discharge",
+      "expected": {
+        "values": {"enphase": 2000, "ess": 0, "home": 3000, "gridImport": 500, "gridExport": 0, "charge": 0, "discharge": 500},
+        "planned": true, "soc": 60, "enphase_monitor": 2100, "home_display": 3000,
+        "home_fallback_active": false, "ess_offline": false, "solar_input": 2000,
+        "imbalance": 0, "balanced": true, "status": "ok", "status_text": "Live / balanced",
+        "issues": [], "notes": [],
+        "edges": [
+          {"id": "enphase-inverter", "watts": 2100, "direction": 1, "active": true, "planned": false, "quality": "measured"},
+          {"id": "ess-inverter-pv", "watts": 0, "direction": 1, "active": false, "planned": true, "quality": "planned"},
+          {"id": "inverter-grid", "watts": 500, "direction": -1, "active": true, "planned": false, "quality": "measured"},
+          {"id": "inverter-battery", "watts": 500, "direction": -1, "active": true, "planned": false, "quality": "measured"},
+          {"id": "inverter-home", "watts": 3000, "direction": 1, "active": true, "planned": false, "quality": "measured"}
+        ]
+      }
+    },
+    {
+      "name": "balanced_export_and_charge",
+      "readings": {
+        "sensor.example_home": ["1000", "W", "power"],
+        "sensor.example_import": ["0", "W", "power"],
+        "sensor.example_export": ["750", "W", "power"],
+        "sensor.example_charge": ["250", "W", "power"],
+        "sensor.example_discharge": ["0", "W", "power"]
+      },
+      "expected": {
+        "values": {"enphase": 2000, "ess": 0, "home": 1000, "gridImport": 0, "gridExport": 750, "charge": 250, "discharge": 0},
+        "planned": true, "soc": 60, "enphase_monitor": 2100, "home_display": 1000,
+        "home_fallback_active": false, "ess_offline": false, "solar_input": 2000,
+        "imbalance": 0, "balanced": true, "status": "ok", "status_text": "Live / balanced",
+        "issues": [], "notes": [],
+        "edges": [
+          {"id": "enphase-inverter", "watts": 2100, "direction": 1, "active": true, "planned": false, "quality": "measured"},
+          {"id": "ess-inverter-pv", "watts": 0, "direction": 1, "active": false, "planned": true, "quality": "planned"},
+          {"id": "inverter-grid", "watts": 750, "direction": 1, "active": true, "planned": false, "quality": "measured"},
+          {"id": "inverter-battery", "watts": 250, "direction": 1, "active": true, "planned": false, "quality": "measured"},
+          {"id": "inverter-home", "watts": 1000, "direction": 1, "active": true, "planned": false, "quality": "measured"}
+        ]
+      }
+    },
+    {
+      "name": "offline_uses_unverified_ct_not_cached_ess",
+      "bindings": {"ess_cloud_offline": true},
+      "expected": {
+        "values": {"enphase": null, "ess": 0, "home": null, "gridImport": null, "gridExport": null, "charge": null, "discharge": null},
+        "planned": true, "soc": null, "enphase_monitor": 2100, "home_display": 2900,
+        "home_fallback_active": true, "ess_offline": true, "solar_input": null,
+        "imbalance": null, "balanced": false, "status": "error", "status_text": "ESS cloud offline",
+        "issues": ["ESS cloud is offline; its measurements are unavailable"],
+        "notes": ["Home displays an Enphase CT fallback; the ESS total is unverified", "Battery state of charge is unavailable"],
+        "edges": [
+          {"id": "enphase-inverter", "watts": 2100, "direction": 1, "active": true, "planned": false, "quality": "measured"},
+          {"id": "ess-inverter-pv", "watts": 0, "direction": 1, "active": false, "planned": true, "quality": "planned"},
+          {"id": "inverter-grid", "watts": null, "direction": 0, "active": false, "planned": false, "quality": "unavailable"},
+          {"id": "inverter-battery", "watts": null, "direction": 0, "active": false, "planned": false, "quality": "unavailable"},
+          {"id": "inverter-home", "watts": 2900, "direction": 1, "active": false, "planned": false, "quality": "ct-only"}
+        ]
+      }
+    },
+    {
+      "name": "offline_missing_ct_is_not_zero",
+      "bindings": {"ess_cloud_offline": true},
+      "missing": ["sensor.example_ct"],
+      "expected": {
+        "values": {"enphase": null, "ess": 0, "home": null, "gridImport": null, "gridExport": null, "charge": null, "discharge": null},
+        "planned": true, "soc": null, "enphase_monitor": 2100, "home_display": null,
+        "home_fallback_active": false, "ess_offline": true, "solar_input": null,
+        "imbalance": null, "balanced": false, "status": "error", "status_text": "ESS cloud offline",
+        "issues": ["ESS cloud is offline; its measurements are unavailable"],
+        "notes": ["Enphase CT load power is unavailable or has invalid units", "Battery state of charge is unavailable"],
+        "edges": [
+          {"id": "enphase-inverter", "watts": 2100, "direction": 1, "active": true, "planned": false, "quality": "measured"},
+          {"id": "ess-inverter-pv", "watts": 0, "direction": 1, "active": false, "planned": true, "quality": "planned"},
+          {"id": "inverter-grid", "watts": null, "direction": 0, "active": false, "planned": false, "quality": "unavailable"},
+          {"id": "inverter-battery", "watts": null, "direction": 0, "active": false, "planned": false, "quality": "unavailable"},
+          {"id": "inverter-home", "watts": null, "direction": 0, "active": false, "planned": false, "quality": "unavailable"}
+        ]
+      }
+    },
+    {
+      "name": "offline_invalid_ct_unit_is_not_a_fallback",
+      "bindings": {"ess_cloud_offline": true},
+      "readings": {"sensor.example_ct": ["2900", "kWh", "energy"]},
+      "expected": {
+        "values": {"enphase": null, "ess": 0, "home": null, "gridImport": null, "gridExport": null, "charge": null, "discharge": null},
+        "planned": true, "soc": null, "enphase_monitor": 2100, "home_display": null,
+        "home_fallback_active": false, "ess_offline": true, "solar_input": null,
+        "imbalance": null, "balanced": false, "status": "error", "status_text": "ESS cloud offline",
+        "issues": ["ESS cloud is offline; its measurements are unavailable"],
+        "notes": ["Enphase CT load power is unavailable or has invalid units", "Battery state of charge is unavailable"],
+        "edges": [
+          {"id": "enphase-inverter", "watts": 2100, "direction": 1, "active": true, "planned": false, "quality": "measured"},
+          {"id": "ess-inverter-pv", "watts": 0, "direction": 1, "active": false, "planned": true, "quality": "planned"},
+          {"id": "inverter-grid", "watts": null, "direction": 0, "active": false, "planned": false, "quality": "unavailable"},
+          {"id": "inverter-battery", "watts": null, "direction": 0, "active": false, "planned": false, "quality": "unavailable"},
+          {"id": "inverter-home", "watts": null, "direction": 0, "active": false, "planned": false, "quality": "unavailable"}
+        ]
+      }
+    },
+    {
+      "name": "nonzero_planned_pv_requires_commissioning",
+      "readings": {"sensor.example_planned_pv": ["100", "W", "power"]},
+      "expected": {
+        "values": {"enphase": 2000, "ess": 100, "home": 3000, "gridImport": 500, "gridExport": 0, "charge": 0, "discharge": 500},
+        "planned": true, "soc": 60, "enphase_monitor": 2100, "home_display": 3000,
+        "home_fallback_active": false, "ess_offline": false, "solar_input": 2100,
+        "imbalance": null, "balanced": false, "status": "error", "status_text": "ESS data unavailable",
+        "issues": ["Planned ESS PV is nonzero; commissioning is required"], "notes": [],
+        "edges": [
+          {"id": "enphase-inverter", "watts": 2100, "direction": 1, "active": true, "planned": false, "quality": "measured"},
+          {"id": "ess-inverter-pv", "watts": 100, "direction": 1, "active": false, "planned": true, "quality": "planned"},
+          {"id": "inverter-grid", "watts": 500, "direction": -1, "active": false, "planned": false, "quality": "measured"},
+          {"id": "inverter-battery", "watts": 500, "direction": -1, "active": false, "planned": false, "quality": "measured"},
+          {"id": "inverter-home", "watts": 3000, "direction": 1, "active": false, "planned": false, "quality": "measured"}
+        ]
+      }
+    },
+    {
+      "name": "bad_soc_preserves_measured_power",
+      "readings": {"sensor.example_soc": ["101", "%", "battery"]},
+      "expected": {
+        "values": {"enphase": 2000, "ess": 0, "home": 3000, "gridImport": 500, "gridExport": 0, "charge": 0, "discharge": 500},
+        "planned": true, "soc": null, "enphase_monitor": 2100, "home_display": 3000,
+        "home_fallback_active": false, "ess_offline": false, "solar_input": 2000,
+        "imbalance": 0, "balanced": true, "status": "warning", "status_text": "Live / check details",
+        "issues": [], "notes": ["Battery state of charge is unavailable"],
+        "edges": [
+          {"id": "enphase-inverter", "watts": 2100, "direction": 1, "active": true, "planned": false, "quality": "measured"},
+          {"id": "ess-inverter-pv", "watts": 0, "direction": 1, "active": false, "planned": true, "quality": "planned"},
+          {"id": "inverter-grid", "watts": 500, "direction": -1, "active": true, "planned": false, "quality": "measured"},
+          {"id": "inverter-battery", "watts": 500, "direction": -1, "active": true, "planned": false, "quality": "measured"},
+          {"id": "inverter-home", "watts": 3000, "direction": 1, "active": true, "planned": false, "quality": "measured"}
+        ]
+      }
+    },
+    {
+      "name": "energy_totals_are_not_instantaneous_power",
+      "readings": {"sensor.example_import": ["500", "kWh", "energy"]},
+      "expected": {
+        "values": {"enphase": 2000, "ess": 0, "home": 3000, "gridImport": null, "gridExport": 0, "charge": 0, "discharge": 500},
+        "planned": true, "soc": 60, "enphase_monitor": 2100, "home_display": 3000,
+        "home_fallback_active": false, "ess_offline": false, "solar_input": 2000,
+        "imbalance": null, "balanced": false, "status": "error", "status_text": "ESS data unavailable",
+        "issues": ["Grid import power is unavailable or has invalid units"], "notes": [],
+        "edges": [
+          {"id": "enphase-inverter", "watts": 2100, "direction": 1, "active": true, "planned": false, "quality": "measured"},
+          {"id": "ess-inverter-pv", "watts": 0, "direction": 1, "active": false, "planned": true, "quality": "planned"},
+          {"id": "inverter-grid", "watts": null, "direction": 0, "active": false, "planned": false, "quality": "unavailable"},
+          {"id": "inverter-battery", "watts": 500, "direction": -1, "active": false, "planned": false, "quality": "measured"},
+          {"id": "inverter-home", "watts": 3000, "direction": 1, "active": false, "planned": false, "quality": "measured"}
+        ]
+      }
+    },
+    {
+      "name": "negative_directional_meter_is_invalid",
+      "readings": {"sensor.example_export": ["-1", "W", "power"]},
+      "expected": {
+        "values": {"enphase": 2000, "ess": 0, "home": 3000, "gridImport": 500, "gridExport": null, "charge": 0, "discharge": 500},
+        "planned": true, "soc": 60, "enphase_monitor": 2100, "home_display": 3000,
+        "home_fallback_active": false, "ess_offline": false, "solar_input": 2000,
+        "imbalance": null, "balanced": false, "status": "error", "status_text": "ESS data unavailable",
+        "issues": ["Grid export requires a nonnegative directional reading"], "notes": [],
+        "edges": [
+          {"id": "enphase-inverter", "watts": 2100, "direction": 1, "active": true, "planned": false, "quality": "measured"},
+          {"id": "ess-inverter-pv", "watts": 0, "direction": 1, "active": false, "planned": true, "quality": "planned"},
+          {"id": "inverter-grid", "watts": null, "direction": 0, "active": false, "planned": false, "quality": "unavailable"},
+          {"id": "inverter-battery", "watts": 500, "direction": -1, "active": false, "planned": false, "quality": "measured"},
+          {"id": "inverter-home", "watts": 3000, "direction": 1, "active": false, "planned": false, "quality": "measured"}
+        ]
+      }
+    },
+    {
+      "name": "balance_includes_tolerance_boundary",
+      "readings": {"sensor.example_home": ["2950", "W", "power"]},
+      "expected": {
+        "values": {"enphase": 2000, "ess": 0, "home": 2950, "gridImport": 500, "gridExport": 0, "charge": 0, "discharge": 500},
+        "planned": true, "soc": 60, "enphase_monitor": 2100, "home_display": 2950,
+        "home_fallback_active": false, "ess_offline": false, "solar_input": 2000,
+        "imbalance": 50, "balanced": true, "status": "ok", "status_text": "Live / balanced",
+        "issues": [], "notes": [],
+        "edges": [
+          {"id": "enphase-inverter", "watts": 2100, "direction": 1, "active": true, "planned": false, "quality": "measured"},
+          {"id": "ess-inverter-pv", "watts": 0, "direction": 1, "active": false, "planned": true, "quality": "planned"},
+          {"id": "inverter-grid", "watts": 500, "direction": -1, "active": true, "planned": false, "quality": "measured"},
+          {"id": "inverter-battery", "watts": 500, "direction": -1, "active": true, "planned": false, "quality": "measured"},
+          {"id": "inverter-home", "watts": 2950, "direction": 1, "active": true, "planned": false, "quality": "measured"}
+        ]
+      }
+    },
+    {
+      "name": "above_tolerance_stops_unverified_flow",
+      "readings": {"sensor.example_home": ["2949", "W", "power"]},
+      "expected": {
+        "values": {"enphase": 2000, "ess": 0, "home": 2949, "gridImport": 500, "gridExport": 0, "charge": 0, "discharge": 500},
+        "planned": true, "soc": 60, "enphase_monitor": 2100, "home_display": 2949,
+        "home_fallback_active": false, "ess_offline": false, "solar_input": 2000,
+        "imbalance": 51, "balanced": false, "status": "warning", "status_text": "Check meter balance",
+        "issues": [], "notes": [],
+        "edges": [
+          {"id": "enphase-inverter", "watts": 2100, "direction": 1, "active": true, "planned": false, "quality": "measured"},
+          {"id": "ess-inverter-pv", "watts": 0, "direction": 1, "active": false, "planned": true, "quality": "planned"},
+          {"id": "inverter-grid", "watts": 500, "direction": -1, "active": false, "planned": false, "quality": "measured"},
+          {"id": "inverter-battery", "watts": 500, "direction": -1, "active": false, "planned": false, "quality": "measured"},
+          {"id": "inverter-home", "watts": 2949, "direction": 1, "active": false, "planned": false, "quality": "measured"}
+        ]
+      }
+    },
+    {
+      "name": "monitor_can_report_signed_standby",
+      "readings": {"sensor.example_monitor": ["-0.04", "kW", "power"]},
+      "expected": {
+        "values": {"enphase": 2000, "ess": 0, "home": 3000, "gridImport": 500, "gridExport": 0, "charge": 0, "discharge": 500},
+        "planned": true, "soc": 60, "enphase_monitor": -40, "home_display": 3000,
+        "home_fallback_active": false, "ess_offline": false, "solar_input": 2000,
+        "imbalance": 0, "balanced": true, "status": "ok", "status_text": "Live / balanced",
+        "issues": [], "notes": [],
+        "edges": [
+          {"id": "enphase-inverter", "watts": 40, "direction": -1, "active": true, "planned": false, "quality": "measured"},
+          {"id": "ess-inverter-pv", "watts": 0, "direction": 1, "active": false, "planned": true, "quality": "planned"},
+          {"id": "inverter-grid", "watts": 500, "direction": -1, "active": true, "planned": false, "quality": "measured"},
+          {"id": "inverter-battery", "watts": 500, "direction": -1, "active": true, "planned": false, "quality": "measured"},
+          {"id": "inverter-home", "watts": 3000, "direction": 1, "active": true, "planned": false, "quality": "measured"}
+        ]
+      }
+    },
+    {
+      "name": "zero_monitor_is_measured_not_unavailable",
+      "readings": {"sensor.example_monitor": ["0", "W", "power"]},
+      "expected": {
+        "values": {"enphase": 2000, "ess": 0, "home": 3000, "gridImport": 500, "gridExport": 0, "charge": 0, "discharge": 500},
+        "planned": true, "soc": 60, "enphase_monitor": 0, "home_display": 3000,
+        "home_fallback_active": false, "ess_offline": false, "solar_input": 2000,
+        "imbalance": 0, "balanced": true, "status": "ok", "status_text": "Live / balanced",
+        "issues": [], "notes": [],
+        "edges": [
+          {"id": "enphase-inverter", "watts": 0, "direction": 0, "active": false, "planned": false, "quality": "measured"},
+          {"id": "ess-inverter-pv", "watts": 0, "direction": 1, "active": false, "planned": true, "quality": "planned"},
+          {"id": "inverter-grid", "watts": 500, "direction": -1, "active": true, "planned": false, "quality": "measured"},
+          {"id": "inverter-battery", "watts": 500, "direction": -1, "active": true, "planned": false, "quality": "measured"},
+          {"id": "inverter-home", "watts": 3000, "direction": 1, "active": true, "planned": false, "quality": "measured"}
+        ]
+      }
+    },
+    {
+      "name": "missing_monitor_preserves_independent_power",
+      "missing": ["sensor.example_monitor"],
+      "expected": {
+        "values": {"enphase": 2000, "ess": 0, "home": 3000, "gridImport": 500, "gridExport": 0, "charge": 0, "discharge": 500},
+        "planned": true, "soc": 60, "enphase_monitor": null, "home_display": 3000,
+        "home_fallback_active": false, "ess_offline": false, "solar_input": 2000,
+        "imbalance": 0, "balanced": true, "status": "warning", "status_text": "Live / check details",
+        "issues": [], "notes": ["Enphase monitor power is unavailable or has invalid units"],
+        "edges": [
+          {"id": "enphase-inverter", "watts": null, "direction": 0, "active": false, "planned": false, "quality": "unavailable"},
+          {"id": "ess-inverter-pv", "watts": 0, "direction": 1, "active": false, "planned": true, "quality": "planned"},
+          {"id": "inverter-grid", "watts": 500, "direction": -1, "active": true, "planned": false, "quality": "measured"},
+          {"id": "inverter-battery", "watts": 500, "direction": -1, "active": true, "planned": false, "quality": "measured"},
+          {"id": "inverter-home", "watts": 3000, "direction": 1, "active": true, "planned": false, "quality": "measured"}
+        ]
+      }
+    },
+    {
+      "name": "missing_planned_pv_is_unknown_not_zero",
+      "missing": ["sensor.example_planned_pv"],
+      "expected": {
+        "values": {"enphase": 2000, "ess": null, "home": 3000, "gridImport": 500, "gridExport": 0, "charge": 0, "discharge": 500},
+        "planned": true, "soc": 60, "enphase_monitor": 2100, "home_display": 3000,
+        "home_fallback_active": false, "ess_offline": false, "solar_input": null,
+        "imbalance": null, "balanced": false, "status": "error", "status_text": "ESS data unavailable",
+        "issues": ["ESS Solar power is unavailable or has invalid units"], "notes": [],
+        "edges": [
+          {"id": "enphase-inverter", "watts": 2100, "direction": 1, "active": true, "planned": false, "quality": "measured"},
+          {"id": "ess-inverter-pv", "watts": null, "direction": 1, "active": false, "planned": true, "quality": "unavailable"},
+          {"id": "inverter-grid", "watts": 500, "direction": -1, "active": false, "planned": false, "quality": "measured"},
+          {"id": "inverter-battery", "watts": 500, "direction": -1, "active": false, "planned": false, "quality": "measured"},
+          {"id": "inverter-home", "watts": 3000, "direction": 1, "active": false, "planned": false, "quality": "measured"}
+        ]
+      }
+    },
+    {
+      "name": "one_watt_and_zero_do_not_animate",
+      "readings": {
+        "sensor.example_pv": ["1", "W", "power"],
+        "sensor.example_home": ["1", "W", "power"],
+        "sensor.example_import": ["0", "W", "power"],
+        "sensor.example_discharge": ["0", "W", "power"],
+        "sensor.example_monitor": ["1", "W", "power"]
+      },
+      "expected": {
+        "values": {"enphase": 1, "ess": 0, "home": 1, "gridImport": 0, "gridExport": 0, "charge": 0, "discharge": 0},
+        "planned": true, "soc": 60, "enphase_monitor": 1, "home_display": 1,
+        "home_fallback_active": false, "ess_offline": false, "solar_input": 1,
+        "imbalance": 0, "balanced": true, "status": "ok", "status_text": "Live / balanced",
+        "issues": [], "notes": [],
+        "edges": [
+          {"id": "enphase-inverter", "watts": 1, "direction": 1, "active": false, "planned": false, "quality": "measured"},
+          {"id": "ess-inverter-pv", "watts": 0, "direction": 1, "active": false, "planned": true, "quality": "planned"},
+          {"id": "inverter-grid", "watts": 0, "direction": 0, "active": false, "planned": false, "quality": "measured"},
+          {"id": "inverter-battery", "watts": 0, "direction": 0, "active": false, "planned": false, "quality": "measured"},
+          {"id": "inverter-home", "watts": 1, "direction": 1, "active": false, "planned": false, "quality": "measured"}
+        ]
+      }
+    },
+    {
+      "name": "live_missing_home_ct_is_explicitly_unverified",
+      "missing": ["sensor.example_home"],
+      "expected": {
+        "values": {"enphase": 2000, "ess": 0, "home": null, "gridImport": 500, "gridExport": 0, "charge": 0, "discharge": 500},
+        "planned": true, "soc": 60, "enphase_monitor": 2100, "home_display": 2900,
+        "home_fallback_active": true, "ess_offline": false, "solar_input": 2000,
+        "imbalance": null, "balanced": false, "status": "error", "status_text": "ESS data unavailable",
+        "issues": ["Home power is unavailable or has invalid units"],
+        "notes": ["Home displays an Enphase CT fallback; the ESS total is unverified"],
+        "edges": [
+          {"id": "enphase-inverter", "watts": 2100, "direction": 1, "active": true, "planned": false, "quality": "measured"},
+          {"id": "ess-inverter-pv", "watts": 0, "direction": 1, "active": false, "planned": true, "quality": "planned"},
+          {"id": "inverter-grid", "watts": 500, "direction": -1, "active": false, "planned": false, "quality": "measured"},
+          {"id": "inverter-battery", "watts": 500, "direction": -1, "active": false, "planned": false, "quality": "measured"},
+          {"id": "inverter-home", "watts": 2900, "direction": 1, "active": false, "planned": false, "quality": "ct-only"}
+        ]
+      }
+    },
+    {
+      "name": "commissioned_pv_contributes_to_verified_balance",
+      "bindings": {"ess_solar_planned": false},
+      "readings": {
+        "sensor.example_planned_pv": ["500", "W", "power"],
+        "sensor.example_home": ["3500", "W", "power"]
+      },
+      "expected": {
+        "values": {"enphase": 2000, "ess": 500, "home": 3500, "gridImport": 500, "gridExport": 0, "charge": 0, "discharge": 500},
+        "planned": false, "soc": 60, "enphase_monitor": 2100, "home_display": 3500,
+        "home_fallback_active": false, "ess_offline": false, "solar_input": 2500,
+        "imbalance": 0, "balanced": true, "status": "ok", "status_text": "Live / balanced",
+        "issues": [], "notes": [],
+        "edges": [
+          {"id": "enphase-inverter", "watts": 2100, "direction": 1, "active": true, "planned": false, "quality": "measured"},
+          {"id": "ess-inverter-pv", "watts": 500, "direction": 1, "active": true, "planned": false, "quality": "measured"},
+          {"id": "inverter-grid", "watts": 500, "direction": -1, "active": true, "planned": false, "quality": "measured"},
+          {"id": "inverter-battery", "watts": 500, "direction": -1, "active": true, "planned": false, "quality": "measured"},
+          {"id": "inverter-home", "watts": 3500, "direction": 1, "active": true, "planned": false, "quality": "measured"}
+        ]
+      }
+    }
+  ]
+}

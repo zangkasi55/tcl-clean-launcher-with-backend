@@ -518,6 +518,14 @@ class Device:
     def publish_weather(self, snapshot: dict) -> bool:
         return self._publish_panel(snapshot, "weather", "Weather")
 
+    def publish_vehicle(self, snapshot: dict) -> bool:
+        return self._publish_panel(snapshot, "vehicle", "Vehicle")
+
+    def publish_ha_cards(self, mappings: dict) -> bool:
+        from .ha_cards import DirectHaCards
+        document = DirectHaCards.model_validate(mappings).model_dump()
+        return self._publish_panel(document, "ha-cards", "HA card mappings")
+
     def _publish_panel(self, snapshot: dict, name: str, label: str) -> bool:
         payload = json.dumps(snapshot, ensure_ascii=False, allow_nan=False,
                              separators=(",", ":")).encode("utf-8")

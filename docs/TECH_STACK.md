@@ -6,15 +6,17 @@
 
 | Item | Published baseline | Source of truth |
 |---|---|---|
-| Controller/deployment bundle | 2.6.23 | [Compose image tag](../docker-compose.yaml), static asset cache versions and [release](https://github.com/zangkasi55/tcl-clean-launcher-with-backend/releases/tag/v2.6.23) |
-| Native APK | 2.6.18-tcl, Android version code 17 | [app Gradle configuration](../launcher/app/build.gradle) |
+| Current controller/deployment source | 2.6.26 | [Compose image tag](../docker-compose.yaml) and static asset cache versions |
+| Current native source | 2.6.26-tcl, Android version code 20 | [app Gradle configuration](../launcher/app/build.gradle) |
+| Existing packaged download | Controller 2.6.23 / native 2.6.18-tcl | [v2.6.23 release](https://github.com/zangkasi55/tcl-clean-launcher-with-backend/releases/tag/v2.6.23); not a direct-HA release |
 | Python distribution metadata | `tcl-tv-control` 1.0.0 | [pyproject.toml](../controller/pyproject.toml) |
 | Locked runtime dependencies | Exact versions for Linux CPython 3.12 | [requirements.lock](../controller/requirements.lock) |
 | Browser development dependencies | Exact versions | [package-lock.json](../controller/package-lock.json) |
 
 These are not a single synchronized version. A controller-only release does
 not automatically require a new APK. Package metadata 1.0.0 does not mean the
-deployed UI is older than bundle 2.6.23.
+deployed UI is older than the controller bundle. Current source is a
+[direct-HA candidate awaiting physical-TV acceptance](DIRECT_HA.md#status-and-prerequisites).
 
 ## Native launcher
 
@@ -28,14 +30,17 @@ deployed UI is older than bundle 2.6.23.
 | RecyclerView | 1.3.2 | App rows and full catalog |
 | DynamicAnimation | 1.0.0 | Focus/highlight animation |
 | R8 | Release build enabled | Code shrinking, optimization and resource shrinking |
-| Tests | JUnit 4.13.2 | JVM navigation, layout and data-policy tests |
+| Direct HA | Java-WebSocket 1.6.0; slf4j-nop 2.0.13 | Bounded WSS sessions with platform TLS verification |
+| Credential storage | Android Keystore, AES-256-GCM | TV-private encrypted origin/token; no export to the backend |
+| Tests | JUnit 4.13.2; Robolectric 4.14.1 | JVM policies, real Android view/activity ownership and lifecycle regressions |
 | Font | Outfit | Bundled with its SIL OFL notice |
 
 The package ID remains `com.gathin.tvhome` for continuity with the upstream
-launcher and the signed installation. The native app has no `INTERNET`
-permission. Existing network/Wi-Fi state and fine-location declarations are
-used for the network label; accessibility services are explicit compatibility
-features, not a general network or background sync client.
+launcher and the signed installation. `INTERNET` is now declared for optional
+direct HA; connections are visible-card/lifecycle bound, not a persistent
+background sync service. Existing network/Wi-Fi state and fine-location
+declarations serve the network label. Accessibility services are separately
+owned remote-key/compatibility features.
 
 ## Backend
 
@@ -108,13 +113,17 @@ network behavior; this project's design does not change or audit those services.
 | Server image upload | 8 MiB; at most 20 million decoded pixels |
 | Final server wallpaper | At most 300 KiB |
 | Native panel snapshot | At most 16,384 bytes per JSON file |
+| Direct mapping document | Schema 1; strict UTF-8; 1-16,384 bytes; no credentials |
+| Direct WSS protocol | 1 MiB frame; 10-second deadlines; reconnect backoff capped at 60 seconds |
+| Direct connection ownership | One session per visible enabled card type, coordinated on one serial worker |
+| Information card widths | Energy 30%, Haval 10%, Weather 30% of full screen |
 | Favorites and columns | 1-7 distinct favorites; 4-7 columns; favorites must fit |
 | App-order list | At most 256 distinct activity components |
 | Daily allowance | 1-1,440 minutes; starts disabled |
 | Real-device sampling | About 5 seconds; not a precise playback-duration meter |
 | Container memory | 512 MiB in supplied Compose |
 | Container temporary storage | 32 MiB tmpfs in supplied Compose |
-| CI APK size ceiling | Strictly less than 409,600 bytes |
+| CI APK size ceiling | 1-409,600 bytes inclusive |
 
 Boundary validation is not a guarantee that every phone can decode a maximum
 size photo within its memory budget. A smaller JPEG is the practical recovery
@@ -125,9 +134,11 @@ option if the device cannot prepare a large source.
 The repository contains pytest/httpx backend tests, Ruff checks, Node unit
 tests, WebKit regressions, JVM tests and upstream Python unittest checks.
 The current [GitHub workflow](../.github/workflows/ci.yml) automatically runs
-the launcher build/lint/JVM tests, APK size check and upstream lists/tools/docs
-tests. Backend and photo suites must still be run separately by contributors;
-they are **not automatically covered by that workflow**.
+the launcher build/lint/JVM tests, exact APK size boundary and upstream
+lists/tools/docs tests. It also runs controller pytest/Ruff, Node photo tests,
+sequential isolated WebKit mapping/photo tests and Windows synthetic release
+acceptance tests. CI does not install/provision a physical TV or certify its
+TLS/Keystore, remote, firmware or iPhone behavior.
 
 See [build and testing](BUILD.md) for exact commands and
 [contributing](../CONTRIBUTING.md) for the review matrix.
